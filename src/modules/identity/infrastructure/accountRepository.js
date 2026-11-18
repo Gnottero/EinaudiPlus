@@ -17,10 +17,15 @@ export const accountRepository = {
     return rpc("account_list");
   },
 
-  async create({ username, passwordHash, ruolo, attore }) {
+  async create({ username, passwordHash, ruolo, attore, sectionId = null }) {
     return rpc("account_create", {
       p_username: username, p_password_hash: passwordHash, p_ruolo: ruolo, p_attore: attore,
+      p_section_id: sectionId,
     });
+  },
+
+  async setSection({ id, sectionId }) {
+    return rpc("account_set_section", { p_id: id, p_section_id: sectionId });
   },
 
   async setPassword({ id, passwordHash }) {

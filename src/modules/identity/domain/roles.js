@@ -9,43 +9,46 @@
 // account senza decidere la sua policy non è possibile, perché authorize()
 // è l'unico modo con cui l'adapter scopre se può procedere.
 
+import { can, PERMESSI } from "./permissions.js";
+
 /**
- * `fdo` e `staff` hanno gli stessi poteri operativi (macchine, segnalazioni,
- * prenotazioni per la Direzione, sala conferenze), ma restano ruoli distinti:
- * l'audit log registra CHI ha fatto cosa, e "l'ha fatto la portineria" e
- * "l'ha fatto lo staff" sono due risposte diverse in caso di dubbio su una
- * macchina segnata guasta. `sistemista` può in più le regole ricorrenti,
- * la pulizia dei dati e la gestione degli altri account.
- *
- * `delegato` è diverso in natura dagli altri tre: non è un livello in più di
- * fiducia operativa, è un ruolo STRETTO a una sola cosa — organizzare una
- * Grigliata (vedi src/modules/grigliata). Un delegato non vede macchine,
- * segnalazioni, bici, ne' nessun'altra sezione: la sua policy vive nel
- * modulo Grigliata, non qui. Il sistemista resta sopra a tutti, delegato
- * compreso, e vede anche la Grigliata.
+ * Quattro ruoli (v2.0). I permessi di ciascuno stanno in permissions.js; qui
+ * solo i nomi.
+ *  - `superadmin`: la piattaforma, senza sezione: crea sezioni, intervalli e
+ *    lavanderie, nomina gli admin, vede tutto;
+ *  - `admin`: l'amministratore di UNA sezione;
+ *  - `fdo`: la portineria di una sezione;
+ *  - `delegato`: ruolo STRETTO a una sola cosa — la Grigliata (vedi
+ *    src/modules/grigliata).
+ * Ogni account tranne il superadmin appartiene a una sezione
+ * (admin_account.section_id).
  */
-export const RUOLI = new Set(["fdo", "staff", "sistemista", "delegato"]);
+export const RUOLI = new Set(["superadmin", "admin", "fdo", "delegato"]);
 
 export function isValidRole(role) {
   return RUOLI.has(role);
 }
 
-export function isSysadmin(claims) {
-  return claims?.r === "sistemista";
+/** Il ruolo di piattaforma: crea sezioni, intervalli e lavanderie, vede tutto. */
+export function isSuperadmin(claims) {
+  return claims?.r === "superadmin";
 }
 
-export function isStaff(claims) {
-  return claims?.r === "staff";
+export function isAdmin(claims) {
+  return claims?.r === "admin";
 }
 
 export function isDelegato(claims) {
   return claims?.r === "delegato";
 }
 
-// Azioni di gestione account riservate al sistemista.
-const SOLO_SISTEMISTA = new Set([
+/** I ruoli che un account di una sezione puo' avere (tutti tranne superadmin). */
+export const RUOLI_DI_SEZIONE = new Set(["admin", "fdo", "delegato"]);
+
+// Azioni di gestione account (permesso accounts.manage).
+const AZIONI_ACCOUNT = new Set([
   "accountList", "accountCreate", "accountSetPassword", "accountSetActive", "accountDelete",
-  "accountSetCamera",
+  "accountSetCamera", "accountSetSection",
 ]);
 
 /**
@@ -62,7 +65,11 @@ export function authorize(claims, action) {
   // provvisoria ancora attiva (quel controllo resta a monte, nell'adapter).
   if (action === "accountChangeOwnPassword") return Boolean(claims);
 
-  if (SOLO_SISTEMISTA.has(action)) return isSysadmin(claims);
+  // Gestire gli account è un permesso della matrice (permissions.js). Resta
+  // l'obbligo, in data.js, che un admin tocchi solo fdo/delegato della propria
+  // sezione (e che accountSetSection sia del solo superadmin): qui si decide
+  // solo il ruolo.
+  if (AZIONI_ACCOUNT.has(action)) return can(claims, PERMESSI.ACCOUNTS_MANAGE);
 
   return null; // azione non gestita da questo modulo
 }

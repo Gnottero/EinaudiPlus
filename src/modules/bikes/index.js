@@ -4,7 +4,7 @@
 // Dipende da Notifications solo per avvisare una camera (notifyRoom):
 // Bikes non sa nulla di push/Telegram, tramite la superficie pubblica di
 // quel modulo — la stessa dipendenza cross-modulo già vista fra Laundry e
-// Identity (per isStaff/isSysadmin).
+// Identity (per i permessi).
 
 import { bikeRepository } from "./infrastructure/bikeRepository.js";
 import { notifyRoom as notifyRoomChannel } from "../notifications/index.js";
@@ -32,8 +32,8 @@ export async function adminListBikes() {
   return _adminListBikes({}, deps);
 }
 
-export async function adminPurgeBikes() {
-  return _adminPurgeBikes({}, deps);
+export async function adminPurgeBikes(sectionCode = null) {
+  return _adminPurgeBikes({ sectionCode }, deps);
 }
 
 export async function adminDeleteBikeRoom(room) {

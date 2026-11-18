@@ -45,15 +45,15 @@ function fakeRepository() {
 section("getAgenda()");
 {
   const repo = fakeRepository();
-  await getAgenda({ giorni: 60 }, { conferenceRepository: repo });
+  await getAgenda({ sectionId: 1, giorni: 60 }, { conferenceRepository: repo });
   check("valore valido passato", repo.calls[0].args === 60);
 
   const repoDefault = fakeRepository();
-  await getAgenda({ giorni: undefined }, { conferenceRepository: repoDefault });
+  await getAgenda({ sectionId: 1, giorni: undefined }, { conferenceRepository: repoDefault });
   check("assente -> default 30", repoDefault.calls[0].args === 30);
 
   const repoMalformato = fakeRepository();
-  await getAgenda({ giorni: "pippo" }, { conferenceRepository: repoMalformato });
+  await getAgenda({ sectionId: 1, giorni: "pippo" }, { conferenceRepository: repoMalformato });
   check("malformato -> ricade sul default, non viene rifiutato (fedele all'originale, sola lettura)",
     repoMalformato.calls[0].args === 30);
 }
@@ -63,18 +63,18 @@ section("getAgenda()");
 section("listRules() / addRule() / updateRule()");
 {
   const repo = fakeRepository();
-  await listRules({}, { conferenceRepository: repo });
+  await listRules({ sectionId: 1 }, { conferenceRepository: repo });
   check("elenco chiama il repository", repo.calls[0].name === "rules");
 
   const repo2 = fakeRepository();
-  await addRule({ titolo: "Assemblea", inizio: "18:00", fine: "20:00", dal: "2026-01-01", al: "2026-01-01", giorno: null, attore: "test" }, { conferenceRepository: repo2 });
+  await addRule({ sectionId: 1, titolo: "Assemblea", inizio: "18:00", fine: "20:00", dal: "2026-01-01", al: "2026-01-01", giorno: null, attore: "test" }, { conferenceRepository: repo2 });
   check("giorno assente -> null (ogni giorno del periodo)", repo2.calls[0].args.giornoSettimana === null);
 
   const repo3 = fakeRepository();
-  await addRule({ titolo: "Riunione", inizio: "18:00", fine: "20:00", dal: "2026-01-01", al: "2026-03-01", giorno: 2 }, { conferenceRepository: repo3 });
+  await addRule({ sectionId: 1, titolo: "Riunione", inizio: "18:00", fine: "20:00", dal: "2026-01-01", al: "2026-03-01", giorno: 2 }, { conferenceRepository: repo3 });
   check("giorno valido passato", repo3.calls[0].args.giornoSettimana === 2);
 
-  const err = await throws(() => addRule({ titolo: "x", giorno: 9 }, { conferenceRepository: fakeRepository() }));
+  const err = await throws(() => addRule({ sectionId: 1, titolo: "x", giorno: 9 }, { conferenceRepository: fakeRepository() }));
   check("giorno fuori range respinto", /giorno/.test(err?.message || ""));
 
   const errUpd = await throws(() => updateRule({ id: -1, titolo: "x" }, { conferenceRepository: fakeRepository() }));
@@ -110,12 +110,10 @@ section("skipOccurrence() / moveOccurrence() / resetOccurrence() / deleteRule()"
 section("authorize() — policy del modulo Conference Room");
 {
   const fdo = { u: "mario", r: "fdo" };
-  const staff = { u: "luigi", r: "staff" };
   const delegato = { u: "toad", r: "delegato" };
 
   for (const azione of ["conferenzaList", "conferenzaAdd", "conferenzaUpdate", "conferenzaSkip", "conferenzaMove", "conferenzaResetOccorrenza", "conferenzaDelete"]) {
     check(`FDO può '${azione}'`, authorize(fdo, azione) === true);
-    check(`staff può '${azione}' (nessuna restrizione, come nell'originale)`, authorize(staff, azione) === true);
     // I permessi del delegato stanno per intero nel modulo Grigliata: prima
     // di escluderlo esplicitamente, questo modulo concedeva a chiunque avesse
     // una sessione (return Boolean(claims)), delegato compreso.

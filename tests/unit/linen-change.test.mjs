@@ -37,7 +37,7 @@ function fakeRepository(initial = { ok: true, ancora_data: null, ancora_tipo: nu
     },
     async getNotifyPref(room) { calls.push({ name: "getNotifyPref", room }); return { ok: true, enabled: true, notify_time: "08:00:00" }; },
     async setNotifyPref(args) { calls.push({ name: "setNotifyPref", args }); return { ok: true }; },
-    async claimDueNotifications() { calls.push({ name: "claimDueNotifications" }); return { ok: true, tipo: "grande", righe: ["214"] }; },
+    async claimDueNotifications() { calls.push({ name: "claimDueNotifications" }); return { ok: true, righe: [{ room: "V214", tipo: "grande" }] }; },
   };
 }
 
@@ -99,7 +99,7 @@ section("isValidTime()");
 section("getLinenChangeAnchor()");
 {
   const repo = fakeRepository({ ok: true, ancora_data: "2026-09-01", ancora_tipo: "grande" });
-  const res = await getLinenChangeAnchor({}, { linenChangeRepository: repo });
+  const res = await getLinenChangeAnchor({ sectionId: 1 }, { linenChangeRepository: repo });
   check("legge l'ancora salvata, non un valore ricalcolato",
     res.ancora_data === "2026-09-01" && res.ancora_tipo === "grande", JSON.stringify(res));
   // linen_change_admin_get() non ha mai avuto 'ok' nel suo jsonb_build_object
@@ -117,22 +117,22 @@ section("getLinenChangeAnchor()");
 section("setLinenChangeAnchor()");
 {
   const repo = fakeRepository();
-  await setLinenChangeAnchor({ data: "2026-09-15", tipo: "grande" }, { linenChangeRepository: repo });
+  await setLinenChangeAnchor({ sectionId: 1, data: "2026-09-15", tipo: "grande" }, { linenChangeRepository: repo });
   check("data e tipo validi passano al repository",
     repo.calls[0].name === "setAnchor"
     && repo.calls[0].args.data === "2026-09-15"
     && repo.calls[0].args.tipo === "grande");
 
   const errTipo = await throws(() =>
-    setLinenChangeAnchor({ data: "2026-09-15", tipo: "medio" }, { linenChangeRepository: fakeRepository() }));
+    setLinenChangeAnchor({ sectionId: 1, data: "2026-09-15", tipo: "medio" }, { linenChangeRepository: fakeRepository() }));
   check("tipo non riconosciuto respinto prima del repository", errTipo?.message === "tipo non valido");
 
   const errGiorno = await throws(() =>
-    setLinenChangeAnchor({ data: "2026-09-14", tipo: "grande" }, { linenChangeRepository: fakeRepository() }));
+    setLinenChangeAnchor({ sectionId: 1, data: "2026-09-14", tipo: "grande" }, { linenChangeRepository: fakeRepository() }));
   check("una data che non è martedì viene respinta", errGiorno?.message === "la data deve essere un martedì");
 
   const repoNonToccato = fakeRepository();
-  await throws(() => setLinenChangeAnchor({ data: "2026-09-14", tipo: "grande" }, { linenChangeRepository: repoNonToccato }));
+  await throws(() => setLinenChangeAnchor({ sectionId: 1, data: "2026-09-14", tipo: "grande" }, { linenChangeRepository: repoNonToccato }));
   check("e il repository non viene chiamato", repoNonToccato.calls.length === 0);
 }
 
@@ -141,27 +141,27 @@ section("setLinenChangeAnchor()");
 section("setLinenChangeSkip()");
 {
   const repo = fakeRepository();
-  await setLinenChangeSkip({ data: "2026-09-15", salta: true }, { linenChangeRepository: repo });
+  await setLinenChangeSkip({ sectionId: 1, data: "2026-09-15", salta: true }, { linenChangeRepository: repo });
   check("salta=true passa al repository così com'è",
     repo.calls[0].name === "setSkip" && repo.calls[0].args.data === "2026-09-15" && repo.calls[0].args.salta === true);
 
   const repo2 = fakeRepository();
-  await setLinenChangeSkip({ data: "2026-09-15", salta: false }, { linenChangeRepository: repo2 });
+  await setLinenChangeSkip({ sectionId: 1, data: "2026-09-15", salta: false }, { linenChangeRepository: repo2 });
   check("salta=false (annulla il salto) passa altrettanto",
     repo2.calls[0].args.salta === false);
 
   // Valori "truthy"/"falsy" arrivati dal corpo JSON (es. non booleani veri)
   // si normalizzano, non si passano grezzi.
   const repo3 = fakeRepository();
-  await setLinenChangeSkip({ data: "2026-09-15", salta: undefined }, { linenChangeRepository: repo3 });
+  await setLinenChangeSkip({ sectionId: 1, data: "2026-09-15", salta: undefined }, { linenChangeRepository: repo3 });
   check("salta assente diventa false, non undefined", repo3.calls[0].args.salta === false);
 
   const errGiorno = await throws(() =>
-    setLinenChangeSkip({ data: "2026-09-14", salta: true }, { linenChangeRepository: fakeRepository() }));
+    setLinenChangeSkip({ sectionId: 1, data: "2026-09-14", salta: true }, { linenChangeRepository: fakeRepository() }));
   check("una data che non è martedì viene respinta", errGiorno?.message === "la data deve essere un martedì");
 
   const repoNonToccato = fakeRepository();
-  await throws(() => setLinenChangeSkip({ data: "2026-09-14", salta: true }, { linenChangeRepository: repoNonToccato }));
+  await throws(() => setLinenChangeSkip({ sectionId: 1, data: "2026-09-14", salta: true }, { linenChangeRepository: repoNonToccato }));
   check("e il repository non viene chiamato", repoNonToccato.calls.length === 0);
 }
 
@@ -170,8 +170,8 @@ section("setLinenChangeSkip()");
 section("getNotifyPref()");
 {
   const repo = fakeRepository();
-  await getNotifyPref({ room: " 214 " }, { linenChangeRepository: repo });
-  check("la camera ripulita (numero di camera valido) passa al repository", repo.calls[0].room === "214");
+  await getNotifyPref({ room: " V214 " }, { linenChangeRepository: repo });
+  check("la camera ripulita (numero di camera valido) passa al repository", repo.calls[0].room === "V214");
 
   const err = await throws(() => getNotifyPref({ room: "non una camera" }, { linenChangeRepository: fakeRepository() }));
   check("una camera non valida viene respinta", err?.message === "camera non valida");
@@ -180,15 +180,15 @@ section("getNotifyPref()");
 section("setNotifyPref()");
 {
   const repo = fakeRepository();
-  await setNotifyPref({ room: " 214 ", enabled: false, notifyTime: "09:30" }, { linenChangeRepository: repo });
+  await setNotifyPref({ room: " V214 ", enabled: false, notifyTime: "09:30" }, { linenChangeRepository: repo });
   check("camera ripulita, enabled e orario passano al repository",
-    repo.calls[0].args.room === "214" && repo.calls[0].args.enabled === false && repo.calls[0].args.notifyTime === "09:30");
+    repo.calls[0].args.room === "V214" && repo.calls[0].args.enabled === false && repo.calls[0].args.notifyTime === "09:30");
 
   // enabled assente o non booleano ricade su true: coerente col default
   // lato SQL, non un errore bloccante — stessa scelta di senzaGlutine in
   // iscriviti.js ma all'inverso (qui il default e' true, non false).
   const repoDefault = fakeRepository();
-  await setNotifyPref({ room: "214", notifyTime: "09:30" }, { linenChangeRepository: repoDefault });
+  await setNotifyPref({ room: "V214", notifyTime: "09:30" }, { linenChangeRepository: repoDefault });
   check("enabled assente -> true", repoDefault.calls[0].args.enabled === true);
 
   const errCamera = await throws(() =>
@@ -196,7 +196,7 @@ section("setNotifyPref()");
   check("una camera non valida viene respinta", errCamera?.message === "camera non valida");
 
   const errOrario = await throws(() =>
-    setNotifyPref({ room: "214", enabled: true, notifyTime: "non un orario" }, { linenChangeRepository: fakeRepository() }));
+    setNotifyPref({ room: "V214", enabled: true, notifyTime: "non un orario" }, { linenChangeRepository: fakeRepository() }));
   check("un orario non valido viene respinto", errOrario?.message === "orario non valido");
 
   const repoNonToccato = fakeRepository();
@@ -217,25 +217,34 @@ section("sendDueLinenChangeNotifications()");
   })();
   const res = await sendDueLinenChangeNotifications({}, { linenChangeRepository: repo, notifyRoom: notify });
   check("una camera dovuta riceve la notifica, col testo giusto per 'grande'",
-    notify.calls.length === 1 && notify.calls[0].room === "214" && /GRANDE/.test(notify.calls[0].body)
+    notify.calls.length === 1 && notify.calls[0].room === "V214" && /GRANDE/.test(notify.calls[0].body)
     && notify.calls[0].tag === "cambio-biancheria", JSON.stringify(notify.calls));
   check("il conteggio inviati torna al chiamante", res.ok === true && res.inviati === 1);
 
   // Nessuna camera dovuta (non è martedì, o nessuna ha l'orario giusto):
   // nessuna chiamata a notifyRoom, nessun errore.
-  const repoVuoto = { async claimDueNotifications() { return { ok: true, tipo: null, righe: [] }; } };
+  const repoVuoto = { async claimDueNotifications() { return { ok: true, righe: [] }; } };
   const notifyNonChiamato = (() => {
     const calls = [];
     const fn = async () => { calls.push(1); };
     fn.calls = calls;
     return fn;
   })();
+  // Il tipo del martedi' dipende dalla sezione: ogni camera riceve il SUO.
+  const repoMisto = { async claimDueNotifications() { return { ok: true, righe: [{ room: "V214", tipo: "grande" }, { room: "P5", tipo: "piccolo" }, { room: "M7", tipo: "grande" }] }; } };
+  const notifyMisto = (() => { const calls = []; const fn = async (room, title, body) => { calls.push({ room, body }); }; fn.calls = calls; return fn; })();
+  const resMisto = await sendDueLinenChangeNotifications({}, { linenChangeRepository: repoMisto, notifyRoom: notifyMisto });
+  check("ogni camera riceve il tipo della propria sezione",
+    notifyMisto.calls.find((c) => c.room === "V214")?.body.includes("GRANDE")
+    && notifyMisto.calls.find((c) => c.room === "P5")?.body.includes("PICCOLO")
+    && notifyMisto.calls.find((c) => c.room === "M7")?.body.includes("GRANDE") && resMisto.inviati === 3);
+
   const resVuoto = await sendDueLinenChangeNotifications({}, { linenChangeRepository: repoVuoto, notifyRoom: notifyNonChiamato });
   check("nessuna camera dovuta -> nessuna notifica", notifyNonChiamato.calls.length === 0 && resVuoto.inviati === 0);
 
   // 'nessuno': dalla v1.9 la SQL non lo restituisce più (si avvisa solo
   // quando il cambio c'è). Se mai arrivasse, il testo resta comunque giusto.
-  const repoNessuno = { async claimDueNotifications() { return { ok: true, tipo: "nessuno", righe: ["112"] }; } };
+  const repoNessuno = { async claimDueNotifications() { return { ok: true, righe: [{ room: "V112", tipo: "nessuno" }] }; } };
   const notifyNessuno = (() => {
     const calls = [];
     const fn = async (room, title, body, tag) => { calls.push({ room, title, body, tag }); };
@@ -260,24 +269,24 @@ section("un errore della RPC è esponibile all'admin, non generico");
 {
   const repoRotto = repositoryCheRompe("Could not find the function public.linen_change_admin_get");
 
-  const errGet = await throws(() => getLinenChangeAnchor({}, { linenChangeRepository: repoRotto }));
+  const errGet = await throws(() => getLinenChangeAnchor({ sectionId: 1 }, { linenChangeRepository: repoRotto }));
   check("getLinenChangeAnchor: il messaggio vero arriva, non un generico",
     errGet?.message === "Could not find the function public.linen_change_admin_get");
   check("ed è marcato esponibile", errGet?.expose === true);
 
   const errSet = await throws(() =>
-    setLinenChangeAnchor({ data: "2026-09-15", tipo: "grande" }, { linenChangeRepository: repoRotto }));
+    setLinenChangeAnchor({ sectionId: 1, data: "2026-09-15", tipo: "grande" }, { linenChangeRepository: repoRotto }));
   check("setLinenChangeAnchor: stesso comportamento dopo la validazione", errSet?.expose === true);
 
   const errSkip = await throws(() =>
-    setLinenChangeSkip({ data: "2026-09-15", salta: true }, { linenChangeRepository: repoRotto }));
+    setLinenChangeSkip({ sectionId: 1, data: "2026-09-15", salta: true }, { linenChangeRepository: repoRotto }));
   check("setLinenChangeSkip: stesso comportamento dopo la validazione", errSkip?.expose === true);
 
   // Una ValidationError (input rifiutato PRIMA di toccare il repository)
   // non deve passare da questo giro: è già esponibile per conto suo, e
   // avvolgerla di nuovo l'avrebbe solo complicata senza motivo.
   const errValidazione = await throws(() =>
-    setLinenChangeAnchor({ data: "2026-09-14", tipo: "grande" }, { linenChangeRepository: repoRotto }));
+    setLinenChangeAnchor({ sectionId: 1, data: "2026-09-14", tipo: "grande" }, { linenChangeRepository: repoRotto }));
   check("una ValidationError resta quella che è, non passa dalla RPC",
     errValidazione?.message === "la data deve essere un martedì" && errValidazione?.code === "validation_error");
 }
@@ -287,22 +296,18 @@ section("un errore della RPC è esponibile all'admin, non generico");
 section("authorize() — policy del modulo Linen Change");
 {
   const fdo = { u: "mario", r: "fdo" };
-  const staff = { u: "luigi", r: "staff" };
-  const sistemista = { u: "peach", r: "sistemista" };
+  const admin = { u: "peach", r: "admin" };
 
   check("FDO può leggere l'ancora", authorize(fdo, "cambioBiancheriaGet") === true);
   check("FDO può spostare l'ancora", authorize(fdo, "cambioBiancheriaSet") === true);
   check("FDO può saltare un martedì", authorize(fdo, "cambioBiancheriaSkip") === true);
-  check("sistemista può leggere l'ancora", authorize(sistemista, "cambioBiancheriaGet") === true);
-  check("sistemista può spostare l'ancora", authorize(sistemista, "cambioBiancheriaSet") === true);
-  check("sistemista può saltare un martedì", authorize(sistemista, "cambioBiancheriaSkip") === true);
+  check("admin può leggere l'ancora", authorize(admin, "cambioBiancheriaGet") === true);
+  check("admin può spostare l'ancora", authorize(admin, "cambioBiancheriaSet") === true);
+  check("admin può saltare un martedì", authorize(admin, "cambioBiancheriaSkip") === true);
 
   // La distinzione che conta: a differenza del tema (solo sistemista), qui
   // è lo STAFF a restare fuori — la stessa regola di setMachineStatus in
   // laundry/domain/policy.js, non l'opposto di quella del tema.
-  check("staff non può leggere l'ancora", authorize(staff, "cambioBiancheriaGet") === false);
-  check("staff non può spostare l'ancora", authorize(staff, "cambioBiancheriaSet") === false);
-  check("staff non può saltare un martedì", authorize(staff, "cambioBiancheriaSkip") === false);
 
   // I permessi del delegato stanno per intero nel modulo Grigliata.
   const delegato = { u: "toad", r: "delegato" };
@@ -310,7 +315,7 @@ section("authorize() — policy del modulo Linen Change");
   check("il delegato non può spostare l'ancora", authorize(delegato, "cambioBiancheriaSet") === false);
 
   check("nessuno non autenticato può agire", authorize(null, "cambioBiancheriaGet") === false);
-  check("azione di un altro modulo -> null", authorize(sistemista, "temaGet") === null);
+  check("azione di un altro modulo -> null", authorize(admin, "temaGet") === null);
 }
 
 // ─── Esito ────────────────────────────────────────────────────────────────────

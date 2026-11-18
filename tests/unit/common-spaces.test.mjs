@@ -46,10 +46,10 @@ async function throws(fn) {
 section("getBookings()");
 {
   const repo = fakeRepository();
-  await getBookings({ space: "cinema" }, { commonSpacesRepository: repo });
+  await getBookings({ sectionId: 1, space: "cinema" }, { commonSpacesRepository: repo });
   check("sala valida passa lo slug al repository", repo.calls[0].args === "cinema", JSON.stringify(repo.calls[0]));
 
-  const err = await throws(() => getBookings({ space: "piscina" }, { commonSpacesRepository: fakeRepository() }));
+  const err = await throws(() => getBookings({ sectionId: 1, space: "piscina" }, { commonSpacesRepository: fakeRepository() }));
   check("sala inesistente respinta", err?.message === "sala non valida");
 }
 
@@ -58,7 +58,7 @@ section("getBookings()");
 section("bookSpace()");
 {
   const repo = fakeRepository();
-  await bookSpace({ space: "cinema", day: 1, start: 60, end: 120, name: "prova", type: "open" }, { commonSpacesRepository: repo });
+  await bookSpace({ sectionId: 1, space: "cinema", day: 1, start: 60, end: 120, name: "prova", type: "open" }, { commonSpacesRepository: repo });
   check("prenotazione valida passa i campi giusti",
     repo.calls[0].args.space === "cinema" && repo.calls[0].args.day === 1 &&
     repo.calls[0].args.start === 60 && repo.calls[0].args.end === 120 &&
@@ -66,21 +66,21 @@ section("bookSpace()");
     JSON.stringify(repo.calls[0]));
 
   const repoMusic = fakeRepository();
-  await bookSpace({ space: "music", day: 1, start: 60, end: 120, name: "prova", type: "qualsiasi" }, { commonSpacesRepository: repoMusic });
+  await bookSpace({ sectionId: 1, space: "music", day: 1, start: 60, end: 120, name: "prova", type: "qualsiasi" }, { commonSpacesRepository: repoMusic });
   check("type non riconosciuto -> null (il database lo ignora per la musica)", repoMusic.calls[0].args.type === null);
 
-  const err1 = await throws(() => bookSpace({ space: "piscina", day: 1, start: 60, end: 120, name: "x" }, { commonSpacesRepository: fakeRepository() }));
+  const err1 = await throws(() => bookSpace({ sectionId: 1, space: "piscina", day: 1, start: 60, end: 120, name: "x" }, { commonSpacesRepository: fakeRepository() }));
   check("sala inesistente respinta", err1?.message === "sala non valida");
 
-  const err2 = await throws(() => bookSpace({ space: "cinema", day: "x", start: 60, end: 120, name: "x" }, { commonSpacesRepository: fakeRepository() }));
+  const err2 = await throws(() => bookSpace({ sectionId: 1, space: "cinema", day: "x", start: 60, end: 120, name: "x" }, { commonSpacesRepository: fakeRepository() }));
   check("giorno non numerico respinto", err2?.message === "giorno o orario non valido");
 
-  const err3 = await throws(() => bookSpace({ space: "cinema", day: 1, start: 60, end: 0, name: "x" }, { commonSpacesRepository: fakeRepository() }));
+  const err3 = await throws(() => bookSpace({ sectionId: 1, space: "cinema", day: 1, start: 60, end: 0, name: "x" }, { commonSpacesRepository: fakeRepository() }));
   check("end fuori range (0, minimo 1) respinto", err3?.message === "giorno o orario non valido");
 
   // end può arrivare a 2880 (oltre la mezzanotte, come per la lavanderia).
   const repoOverMidnight = fakeRepository();
-  await bookSpace({ space: "music", day: 6, start: 21 * 60, end: 26 * 60, name: "notte" }, { commonSpacesRepository: repoOverMidnight });
+  await bookSpace({ sectionId: 1, space: "music", day: 6, start: 21 * 60, end: 26 * 60, name: "notte" }, { commonSpacesRepository: repoOverMidnight });
   check("fascia oltre la mezzanotte ammessa (end=1560)", repoOverMidnight.calls[0].args.end === 1560);
 }
 
@@ -89,10 +89,10 @@ section("bookSpace()");
 section("clearBooking()");
 {
   const repo = fakeRepository();
-  await clearBooking({ space: "cinema", id: "42" }, { commonSpacesRepository: repo });
+  await clearBooking({ sectionId: 1, space: "cinema", id: "42" }, { commonSpacesRepository: repo });
   check("cancellazione valida passa sala e id", repo.calls[0].args.space === "cinema" && repo.calls[0].args.id === "42");
 
-  const err = await throws(() => clearBooking({ space: "piscina", id: "1" }, { commonSpacesRepository: fakeRepository() }));
+  const err = await throws(() => clearBooking({ sectionId: 1, space: "piscina", id: "1" }, { commonSpacesRepository: fakeRepository() }));
   check("sala inesistente respinta", err?.message === "sala non valida");
 }
 
@@ -117,14 +117,14 @@ section("adminGetSpacesOverview() / adminDeleteSpaceBooking()");
 section("adminBookAsDirezione()");
 {
   const repo = fakeRepository();
-  await adminBookAsDirezione({ space: "cinema", day: 1, start: 60, end: 120 }, { commonSpacesRepository: repo });
+  await adminBookAsDirezione({ sectionId: 1, space: "cinema", day: 1, start: 60, end: 120 }, { commonSpacesRepository: repo });
   check("prenotazione Direzione valida riesce", repo.calls[0].name === "bookAsDirezione");
 
   const errSalaInventata = await throws(() =>
-    adminBookAsDirezione({ space: "piscina", day: 1, start: 60, end: 120 }, { commonSpacesRepository: fakeRepository() }));
+    adminBookAsDirezione({ sectionId: 1, space: "piscina", day: 1, start: 60, end: 120 }, { commonSpacesRepository: fakeRepository() }));
   check("sala inventata respinta (come il percorso pubblico)", errSalaInventata?.message === "sala non valida");
 
-  const err = await throws(() => adminBookAsDirezione({ space: "cinema", day: 9, start: 60, end: 120 }, { commonSpacesRepository: fakeRepository() }));
+  const err = await throws(() => adminBookAsDirezione({ sectionId: 1, space: "cinema", day: 9, start: 60, end: 120 }, { commonSpacesRepository: fakeRepository() }));
   check("giorno fuori range respinto", /day/.test(err?.message || ""));
 }
 
@@ -146,15 +146,15 @@ section("adminAddRecurringRule()");
 section("adminSetSpaceChiuso()");
 {
   const repo = fakeRepository();
-  await adminSetSpaceChiuso({ space: "music", chiuso: true }, { commonSpacesRepository: repo });
+  await adminSetSpaceChiuso({ sectionId: 1, space: "music", chiuso: true }, { commonSpacesRepository: repo });
   check("sala valida passa slug e booleano al repository",
     repo.calls[0].args.space === "music" && repo.calls[0].args.chiuso === true, JSON.stringify(repo.calls[0]));
 
   const repo2 = fakeRepository();
-  await adminSetSpaceChiuso({ space: "music", chiuso: undefined }, { commonSpacesRepository: repo2 });
+  await adminSetSpaceChiuso({ sectionId: 1, space: "music", chiuso: undefined }, { commonSpacesRepository: repo2 });
   check("chiuso assente diventa false, non undefined", repo2.calls[0].args.chiuso === false);
 
-  const err = await throws(() => adminSetSpaceChiuso({ space: "piscina", chiuso: true }, { commonSpacesRepository: fakeRepository() }));
+  const err = await throws(() => adminSetSpaceChiuso({ sectionId: 1, space: "piscina", chiuso: true }, { commonSpacesRepository: fakeRepository() }));
   check("sala inesistente respinta", err?.message === "sala non valida");
 }
 
@@ -163,31 +163,25 @@ section("adminSetSpaceChiuso()");
 section("authorize() — policy del modulo Common Spaces");
 {
   const fdo = { u: "mario", r: "fdo" };
-  const staff = { u: "luigi", r: "staff" };
-  const sistemista = { u: "peach", r: "sistemista" };
+  const admin = { u: "peach", r: "admin" };
   const delegato = { u: "toad", r: "delegato" };
 
   // I permessi del delegato stanno per intero nel modulo Grigliata.
   check("il delegato non può leggere la panoramica sale", authorize(delegato, "spaces") === false);
   check("il delegato non può cancellare una prenotazione sala", authorize(delegato, "deleteSpaceBooking") === false);
 
-  check("staff può leggere la panoramica sale", authorize(staff, "spaces") === true);
-  check("staff può cancellare una prenotazione sala", authorize(staff, "deleteSpaceBooking") === true);
-  check("staff può prenotare per la Direzione", authorize(staff, "bookSpaceDirezione") === true);
 
-  check("staff non può creare una regola ricorrente", authorize(staff, "recurringAddSpace") === false);
   check("FDO non può creare una regola ricorrente", authorize(fdo, "recurringAddSpace") === false);
-  check("sistemista può creare una regola ricorrente", authorize(sistemista, "recurringAddSpace") === true);
+  check("admin può creare una regola ricorrente", authorize(admin, "recurringAddSpace") === true);
 
   // Chiudere/riaprire una sala: stesso livello di setMachineStatus in
   // laundry — FDO e sistemista sì, staff e delegato no.
   check("FDO può chiudere/riaprire una sala", authorize(fdo, "spaceSetChiuso") === true);
-  check("sistemista può chiudere/riaprire una sala", authorize(sistemista, "spaceSetChiuso") === true);
-  check("staff NON può chiudere/riaprire una sala", authorize(staff, "spaceSetChiuso") === false);
+  check("admin può chiudere/riaprire una sala", authorize(admin, "spaceSetChiuso") === true);
   check("il delegato NON può chiudere/riaprire una sala", authorize(delegato, "spaceSetChiuso") === false);
 
   check("nessuno non autenticato può agire", authorize(null, "spaces") === false);
-  check("azione di un altro modulo -> null", authorize(sistemista, "setMachineStatus") === null);
+  check("azione di un altro modulo -> null", authorize(admin, "setMachineStatus") === null);
 }
 
 // ─── Esito ────────────────────────────────────────────────────────────────────

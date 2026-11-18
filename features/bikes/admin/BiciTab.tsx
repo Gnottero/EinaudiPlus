@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { call } from "../../admin-shared/adminApi";
 import { S } from "../../admin-shared/adminStyles";
-import { PIANI, pianoDi, nomePiano, colorePiano } from "../../../piani";
+import { gruppiPresenti, pianoDi, nomePiano, colorePiano } from "../../../piani";
 
 // ─── Bici ────────────────────────────────────────────────────────────────────
 //
@@ -184,7 +184,7 @@ export function Bici({ sistemista }: { sistemista: boolean }) {
           </p>
           <div style={{ display: "flex", gap: 8 }}>
             <input
-              style={{ ...S.input, flex: 1 }} placeholder="Numero camera (es. 214 o 21-b)"
+              style={{ ...S.input, flex: 1 }} placeholder="Camera con lettera (es. V214 o V21-b)"
               value={nuovaCamera} disabled={busy}
               onChange={(e) => setNuovaCamera(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter") assegnaCamera(); }}
@@ -201,17 +201,16 @@ export function Bici({ sistemista }: { sistemista: boolean }) {
 
       {dati && dati.camere.length > 0 ? (
         <div style={{ display: "flex", flexDirection: "column", gap: 16, marginBottom: 16 }}>
-          {/* Un gruppo per piano, nell'ordine di PIANI — non alfabetico, cosi'
-              "Manica" (un edificio a se') resta separata dai piani veri e
-              propri, che a loro volta salgono dal primo al quarto. I piani
+          {/* Un gruppo per intervallo di camere (piano, edificio), nell'ordine
+              della configurazione della sezione — non alfabetico. I gruppi
               senza nessuna camera non compaiono: un elenco di intestazioni
               vuote non aiuta chi deve solo vedere dove sono le bici. */}
-          {PIANI.map((p) => {
-            const camere = dati.camere.filter((c) => pianoDi(c.room) === p);
+          {gruppiPresenti(dati.camere.map((c) => c.room)).map((p) => {
+            const camere = dati.camere.filter((c) => pianoDi(c.room)?.key === p.key);
             if (camere.length === 0) return null;
             const colore = colorePiano(p);
             return (
-              <div key={p}>
+              <div key={p.key}>
                 <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 7 }}>
                   <span style={{ width: 9, height: 9, borderRadius: 99, background: colore, flexShrink: 0 }} />
                   <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase", ...S.sub }}>
@@ -229,8 +228,8 @@ export function Bici({ sistemista }: { sistemista: boolean }) {
           })}
 
           {/* Rete di sicurezza: una camera con un formato che non torna in
-              nessun piano (non dovrebbe succedere, bike_set valida il
-              formato lato server) non sparisce silenziosamente. */}
+              nessun piano (non dovrebbe succedere: il server valida la
+              camera) non sparisce silenziosamente. */}
           {(() => {
             const fuoriSchema = dati.camere.filter((c) => pianoDi(c.room) === null);
             if (fuoriSchema.length === 0) return null;

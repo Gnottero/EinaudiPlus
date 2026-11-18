@@ -2,7 +2,7 @@
 // modulo o un adapter in api/ può importare.
 //
 // Dominio coperto: iscrizioni push, collegamento Telegram, promemoria
-// automatici (cron), broadcast manuale del sistemista, e "avvisa una
+// automatici (cron), broadcast manuale dell'admin, e "avvisa una
 // camera" (usato da Bikes). Nessuna azione qui possiede la sua griglia di
 // autorizzazione lato pannello se non tramite domain/policy.js.
 
@@ -66,16 +66,16 @@ export async function notifyRoom(room, title, body, tag) {
   return _notifyRoom({ room, title, body, tag }, deps);
 }
 
-export async function adminListPushSubs() {
-  return _adminListPushSubs({}, deps);
+export async function adminListPushSubs(sectionId = null) {
+  return _adminListPushSubs({ sectionId }, deps);
 }
 
 export async function adminDeletePushSub(id) {
   return _adminDeletePushSub({ id }, deps);
 }
 
-export async function adminListTelegramSubs() {
-  return _adminListTelegramSubs({}, deps);
+export async function adminListTelegramSubs(sectionId = null) {
+  return _adminListTelegramSubs({ sectionId }, deps);
 }
 
 export async function adminDeleteTelegramSub(id) {

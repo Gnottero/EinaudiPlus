@@ -17,7 +17,7 @@ import type { RoomKind, RoomBooking, CinemaType } from "../../roomsApi";
 import RuotaPicker from "../../RuotaPicker";
 import { Toast } from "../../pannelli";
 import { pianoDi, colorePiano } from "../../piani";
-import { isValidRoom } from "../../modello";
+import { isValidRoom, completeRoom } from "../../modello";
 import { call as adminCall } from "../admin-shared/adminApi";
 import type { Role as AdminRole } from "../../AdminPanel";
 
@@ -28,7 +28,7 @@ import type { Role as AdminRole } from "../../AdminPanel";
 // piu' un testo suo, tradotto qui una seconda volta — arriva dallo stesso
 // dizionario che usa la lavanderia, cosi' il testo e' letteralmente lo
 // stesso in ogni sala, non solo tradotto allo stesso modo per coincidenza.
-import { T as T_APP, type Lang } from "../../i18n";
+import { T as T_APP, isFeatureOffError, type Lang } from "../../i18n";
 
 const RED = "var(--primary)", RED_FG = "var(--primary-foreground)";
 const OOS = "var(--destructive)";
@@ -563,7 +563,7 @@ export default function RoomView({ room, lang, roomNumber, adminRole }: {
   // sistemista, non lo staff — stessa policy lato server
   // (src/modules/common-spaces/domain/policy.js), qui serve solo a
   // decidere se mostrare il pulsante.
-  const canLockSpace = adminRole === "fdo" || adminRole === "sistemista";
+  const canLockSpace = adminRole === "fdo" || adminRole === "admin" || adminRole === "superadmin";
 
   const [bookings, setBookings] = useState<RoomBooking[]>([]);
   // FDO/sistemista può chiudere la sala (es. per il deposito dei pacchi):
@@ -574,6 +574,7 @@ export default function RoomView({ room, lang, roomNumber, adminRole }: {
   const [lockBusy, setLockBusy] = useState(false);
   const [loading, setLoading]   = useState(true);
   const [error, setError]       = useState(false);
+  const [spenta, setSpenta]       = useState(false);   // 403: funzione spenta dalla sezione
   const [selDay, setSelDay]     = useState(TODAY);
   const [start, setStart]       = useState(room === "music" ? 16 * 60 : 18 * 60);
   const [end, setEnd]           = useState(room === "music" ? 18 * 60 : 20 * 60);
@@ -608,7 +609,7 @@ export default function RoomView({ room, lang, roomNumber, adminRole }: {
       const s = await roomsApi.getRoomState(room);
       setBookings(s.bookings); setChiuso(s.chiuso); setError(false);
     }
-    catch { setError(true); }
+    catch (e) { setError(true); setSpenta(isFeatureOffError(e)); }
     finally { setLoading(false); }
   }, [room]);
 
@@ -657,7 +658,11 @@ export default function RoomView({ room, lang, roomNumber, adminRole }: {
   const iStart = Math.max(0, startOpts.indexOf(start));
 
   async function submit() {
-    const who = direzione ? (bookingRoom.trim() || "DIREZIONE") : myRoom ? (bookingRoom.trim() || myRoom) : name.trim();
+    // Chi ha una camera puo' scrivere solo le cifre di un'altra camera della
+    // sua sezione: la lettera si rimette da sola (completeRoom).
+    const who = direzione ? (bookingRoom.trim() || "DIREZIONE")
+      : myRoom ? completeRoom(bookingRoom.trim() || myRoom, myRoom)
+      : name.trim();
     if (!who) { setToast(t.needName); return; }
 
     // Il formato camera si controlla solo a chi UNA camera ce l'ha.
@@ -757,7 +762,7 @@ export default function RoomView({ room, lang, roomNumber, adminRole }: {
   }
   if (error) {
     return <div className="flex-1 flex flex-col items-center justify-center gap-3 px-8 text-center" style={{ color: sub }}>
-      <AlertTriangle size={26} style={{ color: OOS }} /><p className="text-sm">{t.netError}</p>
+      <AlertTriangle size={26} style={{ color: OOS }} /><p className="text-sm">{spenta ? gt.funzioneNonAttiva : t.netError}</p>
       <button onClick={() => { setLoading(true); refresh(); }} className="rounded-xl px-4 py-2 text-sm font-semibold" style={{ background: RED, color: RED_FG }}>{t.retry}</button>
     </div>;
   }

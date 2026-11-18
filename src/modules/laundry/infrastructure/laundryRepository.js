@@ -38,8 +38,8 @@ export const laundryRepository = {
     return rpc("set_machine_status", { p_room: room, p_machine: machine, p_oos: oos });
   },
 
-  async deleteBooking({ id }) {
-    return rpc("admin_delete_booking", { p_id: id });
+  async deleteBooking({ id, sectionIds = null }) {
+    return rpc("admin_delete_booking", { p_id: id, p_section_ids: sectionIds });
   },
 
   async forceBook({ laundryId, day, slot, machine, room }) {

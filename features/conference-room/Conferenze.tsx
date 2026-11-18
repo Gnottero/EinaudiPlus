@@ -15,7 +15,7 @@ import { useState, useEffect, useCallback, lazy, Suspense } from "react";
 import { Loader2, AlertTriangle, ChevronLeft, ChevronRight, X, Printer, Download } from "lucide-react";
 import * as conferenze from "../../conferenzeApi";
 import type { Occorrenza, Agenda } from "../../conferenzeApi";
-import { T, type Lang } from "../../i18n";
+import { T, isFeatureOffError, type Lang } from "../../i18n";
 import { RED, GREEN, GREEN_T, OOS_C, OOS_T, FG, SUB, DIV, SURF, CHIP } from "../../tema";
 import type { Role as AdminRole } from "../../AdminPanel";
 
@@ -61,6 +61,8 @@ export default function Conferenze({ lang, adminRole }: { lang: Lang; adminRole:
   const [agenda, setAgenda] = useState<Agenda | null>(null);
   const [loading, setLoading] = useState(true);
   const [errore, setErrore] = useState(false);
+  // 403: la sezione ha spento questa funzione (messaggio dedicato, non "rete").
+  const [spenta, setSpenta] = useState(false);
   const [selezionato, setSelezionato] = useState<string | null>(null);
   const [stampaAperta, setStampaAperta] = useState(false);
 
@@ -89,7 +91,7 @@ export default function Conferenze({ lang, adminRole }: { lang: Lang; adminRole:
   const carica = useCallback(async () => {
     setLoading(true);
     try { setAgenda(await conferenze.agenda(400)); setErrore(false); }
-    catch { setErrore(true); }
+    catch (e) { setErrore(true); setSpenta(isFeatureOffError(e)); }
     finally { setLoading(false); }
   }, []);
 
@@ -108,7 +110,7 @@ export default function Conferenze({ lang, adminRole }: { lang: Lang; adminRole:
     return (
       <div className="flex-1 flex flex-col items-center justify-center gap-3 px-8 text-center" style={{ color: SUB }}>
         <AlertTriangle size={26} style={{ color: OOS_T }} />
-        <p className="text-sm">{t.netError}</p>
+        <p className="text-sm">{spenta ? t.funzioneNonAttiva : t.netError}</p>
         <button onClick={() => carica()}
           className="rounded-xl px-4 py-2 text-sm font-semibold"
           style={{ background: RED, color: "var(--primary-foreground)" }}>{t.retry}</button>

@@ -5,6 +5,8 @@
 // due backend voleva dire tenere in piedi due comportamenti diversi, ognuno da
 // spiegare a chi legge.
 
+import { currentRoom, getCachedConfig, resolveRoom, type Section } from "./sectionsApi";
+
 const TOKEN = import.meta.env.VITE_SECRET_TOKEN;
 
 export type WeekData = Record<string, Record<string, Record<string, string>>>;
@@ -20,15 +22,6 @@ export type TemaStagionale = "nessuno" | "halloween" | "natale";
  *  amministratore ha saltato di proposito quel martedì (distinto da `null`,
  *  che vuol dire "non ancora configurato affatto"). */
 export type CambioBiancheria = "grande" | "piccolo" | "nessuno" | null;
-
-/** La camera dichiarata su questo dispositivo. */
-function currentRoom(): string {
-  try {
-    return localStorage.getItem("laundryhub.room") || "";
-  } catch {
-    return "";
-  }
-}
 
 // Un endpoint solo: quale delle due lavanderie sia lo decide il server con
 // laundry_for_room(). Prima lo sceglieva il client leggendo localStorage a ogni
@@ -67,6 +60,10 @@ async function postAction(action: string, payload: Record<string, unknown>) {
 export async function getSnapshot(): Promise<{
   week: WeekData; status: StatusData; tema: TemaStagionale; cambioBiancheria: CambioBiancheria;
   grigliataAttiva: boolean;
+  /** Coppie lavatrice/asciugatrice della lavanderia di questa camera (1–3). */
+  pairs: number;
+  /** La sezione di questa camera, o null (Direzione, nessuna camera, server vecchio). */
+  section: Section | null;
 }> {
   const qs = `?token=${TOKEN}&room=${encodeURIComponent(currentRoom())}`;
   const res = await fetch(`${ENDPOINT}${qs}`);
@@ -74,6 +71,8 @@ export async function getSnapshot(): Promise<{
 
   const data = await res.json();
   if (!data.ok) throw new Error(data.error || "Errore restituito dal server.");
+
+  snapshotLaundryId = Number.isInteger(data.laundry?.id) ? data.laundry.id : null;
 
   return {
     week: data.week || {}, status: data.status || {}, tema: (data.tema as TemaStagionale) || "nessuno",
@@ -85,6 +84,9 @@ export async function getSnapshot(): Promise<{
     // navigazione. Il contenuto vero lo legge getGrigliataStato() quando la
     // scheda si apre — vedi grigliata_attiva_bool() in SQL.
     grigliataAttiva: Boolean(data.grigliata_attiva),
+    // Server non ancora aggiornato: `pairs` assente -> 3, la sezione non si sa.
+    pairs: Number(data.pairs) >= 1 && Number(data.pairs) <= 3 ? Number(data.pairs) : 3,
+    section: (data.section as Section | null) ?? null,
   };
 }
 
@@ -95,12 +97,17 @@ export async function book(day: number, slot: number, machine: string, room: str
   return postAction("book", { day, slot, machine, room, actor_room: currentRoom() });
 }
 
-/** Le due lavanderie sono separate: 1–99 Manica, dal 100 in su Valentino. */
+/**
+ * Le due camere usano la stessa lavanderia? Lo dice la configurazione delle
+ * sezioni (ogni intervallo punta a una lavanderia; due sezioni possono
+ * condividerla). Senza configurazione, o con una camera che non si riesce a
+ * collocare (DIREZIONE, vuoto), non si giudica: il server decide comunque.
+ */
 export function sameLaundry(a: string, b: string): boolean {
-  const n = (r: string) => { const m = r.match(/^(\d+)/); return m ? Number(m[1]) : NaN; };
-  const x = n(a), y = n(b);
-  if (Number.isNaN(x) || Number.isNaN(y)) return true;   // DIREZIONE o vuoto: non si giudica
-  return (x < 100) === (y < 100);
+  const config = getCachedConfig();
+  const x = resolveRoom(config, a), y = resolveRoom(config, b);
+  if (!x || !y) return true;
+  return x.range.laundry_id === y.range.laundry_id;
 }
 
 // La camera va inclusa: serve al server per sapere di quale lavanderia si parla.
@@ -272,10 +279,18 @@ async function adminAction(action: string, payload: Record<string, unknown>) {
   return data;
 }
 
-/** La lavanderia di una camera, come la calcola il server. 1-99 = Manica. */
+/**
+ * La lavanderia della camera corrente, come la calcola il server: l'ultimo
+ * snapshot la dichiara (`laundry.id`), altrimenti la si ricava dalla
+ * configurazione delle sezioni (intervallo -> lavanderia), altrimenti 1.
+ * Prima era "camere 1–99 = lavanderia 2": una regola che non regge piu' con
+ * sezioni e lavanderie configurabili.
+ */
+let snapshotLaundryId: number | null = null;
+
 function laundryIdFor(room: string): number {
-  const n = parseInt(room.match(/^(\d+)/)?.[1] || "0", 10);
-  return n > 0 && n < 100 ? 2 : 1;
+  if (snapshotLaundryId !== null) return snapshotLaundryId;
+  return resolveRoom(getCachedConfig(), room)?.range.laundry_id ?? 1;
 }
 
 export async function bookAsDirezione(day: number, slot: number, machine: string) {

@@ -1,20 +1,11 @@
-// Policy di autorizzazione del modulo Feedback.
+// Autorizzazione del modulo: quale permesso serve a ciascuna delle SUE azioni.
+// Chi ha quel permesso lo dice la matrice in identity/domain/permissions.js
+// (niente `return true` di default: un ruolo non elencato non può).
 //
-// Macchine e segnalazioni restano affari di FDO e sistemista: lo staff
-// prenota e libera turni per conto della Direzione come l'FDO, ma non deve
-// vedere né toccare le segnalazioni dei residenti.
+// Le segnalazioni: FDO e sistemista (non lo staff).
 
-import { isStaff, isDelegato } from "../../identity/index.js";
+import { makeAuthorize, PERMESSI as P } from "../../identity/index.js";
 
-const AZIONI_FEEDBACK = new Set(["feedback", "markFeedback"]);
-const VIETATE_A_STAFF = new Set(["feedback", "markFeedback"]);
-
-export function authorize(claims, action) {
-  if (!AZIONI_FEEDBACK.has(action)) return null;
-  if (!claims) return false;
-  // I permessi del delegato stanno per intero nel modulo Grigliata — vedi
-  // la stessa riga in laundry/domain/policy.js.
-  if (isDelegato(claims)) return false;
-  if (VIETATE_A_STAFF.has(action) && isStaff(claims)) return false;
-  return true;
-}
+export const authorize = makeAuthorize({
+  feedback: P.FEEDBACK_MANAGE, markFeedback: P.FEEDBACK_MANAGE,
+});

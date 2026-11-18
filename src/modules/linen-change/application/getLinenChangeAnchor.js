@@ -4,11 +4,12 @@
 // oggi: il form deve ripartire da cosa è stato salvato l'ultima volta, non
 // da un valore ricalcolato — vedi linen_change_admin_get() in SQL.
 
+import { requireSectionId } from "../../../shared/validation/section.js";
 import { fromRpcError } from "../../../shared/errors/AppError.js";
 
-export async function getLinenChangeAnchor(_input, { linenChangeRepository }) {
+export async function getLinenChangeAnchor({ sectionId }, { linenChangeRepository }) {
   try {
-    return await linenChangeRepository.adminGet();
+    return await linenChangeRepository.adminGet(requireSectionId(sectionId));
   } catch (err) {
     // fromRpcError() esiste apposta per questo (vedi il suo commento in
     // AppError.js) ma prima d'ora non la chiamava nessuno: senza,

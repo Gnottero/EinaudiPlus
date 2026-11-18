@@ -65,6 +65,10 @@ export function salvaLingua(l: Lang) {
 export const fmtTime = (d: Date, lang: Lang) => T[lang].fmtTime(d);
 export const fmtDay  = (d: Date, lang: Lang) => T[lang].fmtDay(d);
 
+/** Il server ha risposto 403: la sezione ha spento questa funzione. */
+export const isFeatureOffError = (e: any): boolean =>
+  String(e?.message ?? e ?? "").includes("non e' attiva");
+
 /**
  * Traduce un errore del server in una frase leggibile.
  *
@@ -78,5 +82,6 @@ export function errMsg(e: any, lang: Lang) {
   if (msg.includes("occupata") || msg.toLowerCase().includes("taken")) return t.taken(e?.by);
   if (msg.includes("altra lavanderia")) return t.altraLavanderia;
   if (msg.includes("riservata alla direzione")) return t.soloDirezione;
+  if (isFeatureOffError(e)) return t.funzioneNonAttiva;
   return t.genericError;
 }

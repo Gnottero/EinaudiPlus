@@ -11,10 +11,13 @@ type Account = {
   created_at: string; password_at: string; deve_cambiare_password: boolean;
   /** v1.10 — solo delegato/sistemista; assente se il server non ha la migrazione 060. */
   camera?: string | null;
+  /** La sezione dell'account (null solo per il superadmin). */
+  section_id?: number | null;
 };
+type SezioneBreve = { id: number; code: string; name: string };
 
 // Chi può avere una camera sua (è anche un residente): vedi account_set_camera.
-const RUOLI_CON_CAMERA: Role[] = ["delegato", "sistemista"];
+const RUOLI_CON_CAMERA: Role[] = ["delegato", "admin"];
 
 // ─── Account amministrativi ─────────────────────────────────────────────────
 //
@@ -31,24 +34,36 @@ function generaPassword(lunghezza = 16) {
 }
 
 const RUOLI_CREABILI: { value: Role; label: string }[] = [
+  { value: "superadmin", label: "Superadmin (piattaforma)" },
+  { value: "admin", label: "Admin (una sezione)" },
   { value: "fdo", label: "FDO (portineria)" },
-  { value: "staff", label: "Staff" },
-  { value: "sistemista", label: "Sistemista" },
   { value: "delegato", label: "Delegato (Grigliata)" },
 ];
 
 const etichettaData = (iso: string) =>
   new Date(iso).toLocaleDateString("it-IT", { day: "numeric", month: "short", year: "numeric" });
 
-export function Accounts({ me }: { me: string | null }) {
+export function Accounts({ me, myRole }: { me: string | null; myRole: Role | null }) {
   const [items, setItems] = useState<Account[]>([]);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
 
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [ruolo, setRuolo] = useState<Role>("staff");
+  const [ruolo, setRuolo] = useState<Role>("fdo");
   const [mostraPassword, setMostraPassword] = useState(false);
+  // Ogni account non superadmin ha UNA sezione. Un admin crea solo FDO e
+  // delegati della propria (il server la ricava dall'account); il superadmin
+  // sceglie la sezione e puo' creare anche admin e altri superadmin.
+  const superadmin = myRole === "superadmin";
+  const [sezioni, setSezioni] = useState<SezioneBreve[]>([]);
+  const [sezioneNuova, setSezioneNuova] = useState<number | "">("");
+  const [sezioneEdit, setSezioneEdit] = useState<{ id: number; valore: number | "" } | null>(null);
+  const ruoliCreabili = RUOLI_CREABILI.filter((r) => superadmin || r.value === "fdo" || r.value === "delegato");
+  const nomeSezione = (id: number | null | undefined) => {
+    const x = sezioni.find((z) => z.id === id);
+    return x ? `${x.code} · ${x.name}` : id ? `#${id}` : "—";
+  };
 
   // L'account per cui si sta scrivendo una nuova password, se ce n'e' uno.
   const [reset, setReset] = useState<{ id: number; password: string } | null>(null);
@@ -63,13 +78,40 @@ export function Accounts({ me }: { me: string | null }) {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    // Il superadmin le vede tutte (nessun section_id); gli altri solo la propria.
+    call("sectionList", { section_id: undefined })
+      .then((d) => {
+        const lista = (d.sections ?? []).map((x: any) => ({ id: x.id, code: x.code, name: x.name }));
+        setSezioni(lista);
+        setSezioneNuova((cur) => (cur === "" && lista.length > 0 ? lista[0].id : cur));
+      })
+      .catch(() => setSezioni([]));
+  }, []);
+
+  async function salvaSezione() {
+    if (!sezioneEdit || sezioneEdit.valore === "") return;
+    setBusy(true); setMsg(null);
+    try {
+      await call("accountSetSection", { id: sezioneEdit.id, section_id: sezioneEdit.valore });
+      setMsg("Sezione aggiornata.");
+      setSezioneEdit(null);
+      load();
+    } catch (e: any) { setMsg(e.message); }
+    finally { setBusy(false); }
+  }
 
   async function crea() {
     if (!username.trim()) { setMsg("Indica un nome utente."); return; }
     if (password.length < 8) { setMsg("La password deve avere almeno 8 caratteri."); return; }
+    if (superadmin && ruolo !== "superadmin" && sezioneNuova === "") { setMsg("Scegli la sezione dell'account."); return; }
     setBusy(true); setMsg(null);
     try {
-      await call("accountCreate", { username: username.trim(), password, ruolo });
+      await call("accountCreate", {
+        username: username.trim(), password, ruolo,
+        // Un admin non manda la sezione: e' la sua, la decide il server.
+        section_id: !superadmin || ruolo === "superadmin" ? undefined : sezioneNuova,
+      });
       setMsg(`Account "${username.trim()}" creato.`);
       setUsername(""); setPassword(""); setMostraPassword(false);
       load();
@@ -118,8 +160,7 @@ export function Accounts({ me }: { me: string | null }) {
   return (
     <>
       <p style={{ fontSize: 13, ...S.sub, marginBottom: 16 }}>
-        Fdo, staff e sistemista non sono piu' tre password fisse su Vercel: qui puoi
-        creare un account per persona, disattivarlo quando non serve piu' e
+        Ogni account appartiene a una sezione. Qui puoi creare un account per persona, disattivarlo quando non serve piu' e
         reimpostarne la password senza toccare la configurazione del server.
       </p>
 
@@ -131,7 +172,7 @@ export function Accounts({ me }: { me: string | null }) {
           <input style={S.input} placeholder="Nome utente" value={username}
                  maxLength={24} onChange={(e) => setUsername(e.target.value)} />
           <select style={S.input} value={ruolo} onChange={(e) => setRuolo(e.target.value as Role)}>
-            {RUOLI_CREABILI.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
+            {ruoliCreabili.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
           </select>
           <input style={S.input} type={mostraPassword ? "text" : "password"} placeholder="Password (min. 8 caratteri)"
                  value={password} onChange={(e) => setPassword(e.target.value)} />
@@ -141,6 +182,21 @@ export function Accounts({ me }: { me: string | null }) {
           <button style={{ ...S.btn, background: "var(--primary)", color: "var(--primary-foreground)", borderColor: "transparent" }}
                   disabled={busy} onClick={crea}>Crea account</button>
         </div>
+        {superadmin && ruolo !== "superadmin" && (
+          <div style={{ marginTop: 12, fontSize: 13 }}>
+            <label style={{ fontSize: 12, ...S.sub, display: "block", marginBottom: 4 }}>Sezione</label>
+            <select style={{ ...S.input, width: "auto", minWidth: 200 }} value={sezioneNuova}
+                    onChange={(e) => setSezioneNuova(e.target.value === "" ? "" : Number(e.target.value))}>
+              <option value="">Scegli una sezione…</option>
+              {sezioni.map((x) => <option key={x.id} value={x.id}>{x.code} · {x.name}</option>)}
+            </select>
+          </div>
+        )}
+        {!superadmin && sezioni.length > 0 && (
+          <p style={{ fontSize: 12, ...S.sub, marginTop: 10 }}>
+            L'account sara' della tua sezione ({nomeSezione(sezioni[0].id)}): FDO o delegato.
+          </p>
+        )}
         {mostraPassword && password && (
           <p style={{ fontSize: 12, ...S.sub, marginTop: 10 }}>
             Copiala ora: non verra' piu' mostrata dopo la creazione. <strong style={{ color: "var(--foreground)" }}>{password}</strong>
@@ -177,6 +233,17 @@ export function Accounts({ me }: { me: string | null }) {
                   <span style={{ display: "block", fontSize: 12, ...S.sub }}>
                     creato il {etichettaData(a.created_at)} · password aggiornata il {etichettaData(a.password_at)}
                   </span>
+                  <span style={{ display: "block", fontSize: 12, marginTop: 2 }}>
+                    Sezione: <strong>{a.ruolo === "superadmin" ? "tutte" : nomeSezione(a.section_id)}</strong>
+                    {superadmin && a.ruolo !== "superadmin" && (<>
+                      {" · "}
+                      <button disabled={busy}
+                        onClick={() => setSezioneEdit(sezioneEdit?.id === a.id ? null : { id: a.id, valore: a.section_id ?? "" })}
+                        style={{ fontSize: 12, fontWeight: 700, color: "var(--gray-accessible-text)", background: "none", border: "none", cursor: "pointer", padding: 0, textDecoration: "underline" }}>
+                        sposta
+                      </button>
+                    </>)}
+                  </span>
                   {/* Delegato e sistemista spesso sono anche residenti: con la
                       camera associata, dall'app passano fra la propria camera
                       e la Direzione senza uscire dall'account. */}
@@ -206,9 +273,21 @@ export function Accounts({ me }: { me: string | null }) {
                   <button style={S.danger} disabled={busy || a.username === me} onClick={() => elimina(a)}>Elimina</button>
                 </span>
               </div>
+              {sezioneEdit?.id === a.id && (
+                <div className="adm-form" style={{ marginTop: 6 }}>
+                  <select style={S.input} value={sezioneEdit.valore}
+                          onChange={(e) => setSezioneEdit({ id: a.id, valore: e.target.value === "" ? "" : Number(e.target.value) })}>
+                    <option value="">Scegli una sezione…</option>
+                    {sezioni.map((x) => <option key={x.id} value={x.id}>{x.code} · {x.name}</option>)}
+                  </select>
+                  <button style={{ ...S.btn, background: "var(--primary)", color: "var(--primary-foreground)", borderColor: "transparent" }}
+                          disabled={busy} onClick={salvaSezione}>Salva</button>
+                  <button style={S.btn} disabled={busy} onClick={() => setSezioneEdit(null)}>Annulla</button>
+                </div>
+              )}
               {cameraEdit?.id === a.id && (
                 <div className="adm-form" style={{ marginTop: 6 }}>
-                  <input style={S.input} placeholder="Numero di camera (vuoto = nessuna)" inputMode="numeric"
+                  <input style={S.input} placeholder="Camera con lettera, es. V112 (vuoto = nessuna)"
                          value={cameraEdit.valore} maxLength={6}
                          onChange={(e) => setCameraEdit({ id: a.id, valore: e.target.value })} />
                   <button style={{ ...S.btn, background: "var(--primary)", color: "var(--primary-foreground)", borderColor: "transparent" }}

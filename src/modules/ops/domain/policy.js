@@ -1,29 +1,13 @@
-// Policy di autorizzazione del modulo Ops — regole ricorrenti generiche
-// (lavanderia E sala insieme, per questo trasversale), pulizia, conteggi,
-// panoramica. Tutto riservato al sistemista tranne la panoramica, aperta a
-// FDO e sistemista (non staff).
+// Autorizzazione del modulo: quale permesso serve a ciascuna delle SUE azioni.
+// Chi ha quel permesso lo dice la matrice in identity/domain/permissions.js
+// (niente `return true` di default: un ruolo non elencato non può).
+//
+// Panoramica: FDO e sistemista (non lo staff). Tutto il resto: sistemista.
 
-import { isStaff, isSysadmin, isDelegato } from "../../identity/index.js";
+import { makeAuthorize, PERMESSI as P } from "../../identity/index.js";
 
-const AZIONI_OPS = new Set([
-  "overview", "recurringList", "recurringSetActive", "recurringDelete",
-  "applyRecurring", "purge", "counts",
-]);
-
-const SOLO_SISTEMISTA = new Set([
-  "recurringList", "recurringSetActive", "recurringDelete", "applyRecurring", "purge", "counts",
-]);
-
-const VIETATE_A_STAFF = new Set(["overview"]);
-
-export function authorize(claims, action) {
-  if (!AZIONI_OPS.has(action)) return null;
-  if (!claims) return false;
-  if (SOLO_SISTEMISTA.has(action)) return isSysadmin(claims);
-  // I permessi del delegato stanno per intero nel modulo Grigliata — vedi
-  // la stessa riga in laundry/domain/policy.js. Le altre azioni sono già
-  // SOLO_SISTEMISTA; solo "overview" ci arriverebbe altrimenti.
-  if (isDelegato(claims)) return false;
-  if (VIETATE_A_STAFF.has(action) && isStaff(claims)) return false;
-  return true;
-}
+export const authorize = makeAuthorize({
+  overview: P.OPS_OVERVIEW,
+  recurringList: P.OPS_MANAGE, recurringSetActive: P.OPS_MANAGE, recurringDelete: P.OPS_MANAGE,
+  applyRecurring: P.OPS_MANAGE, purge: P.OPS_MANAGE, counts: P.OPS_MANAGE,
+});

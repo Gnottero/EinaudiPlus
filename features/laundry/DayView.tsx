@@ -1,4 +1,5 @@
 import { memo, useState } from "react";
+import { usePairs } from "../../hooks";
 import { Star, Plus } from "lucide-react";
 import { WashingMachine } from "../../icons";
 import { BookModal, type BookTarget } from "./BookModal";
@@ -21,6 +22,7 @@ export const DaySchedule = memo(function DaySchedule({ lang, week, status, roomN
   onScreen: (i: number) => void;
 }) {
   const t = T[lang];
+  const pairs = usePairs();
   const [selDay, setSelDay]       = useState(TODAY_DOW);
   const [target, setTarget]       = useState<BookTarget | null>(null);
   const [modTarget, setModTarget] = useState<ModifyTarget | null>(null);
@@ -32,7 +34,7 @@ export const DaySchedule = memo(function DaySchedule({ lang, week, status, roomN
   const div = "var(--border)";
   const dayData = week[selDay] ?? {};
 
-  const washIds = machinesFor(sessionRoom).washers;
+  const washIds = machinesFor(pairs).washers;
 
   async function confirmBooking(room: string) {
     if (!target) return;

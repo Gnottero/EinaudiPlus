@@ -1,15 +1,13 @@
-// Policy di autorizzazione del modulo Notifications — stesso principio
-// degli altri moduli. Tutte le azioni amministrative (gestione iscrizioni,
-// broadcast) sono riservate al sistemista.
+// Autorizzazione del modulo: quale permesso serve a ciascuna delle SUE azioni.
+// Chi ha quel permesso lo dice la matrice in identity/domain/permissions.js
+// (niente `return true` di default: un ruolo non elencato non può).
+//
+// Iscrizioni e messaggi a tutti: sistemista.
 
-import { isSysadmin } from "../../identity/index.js";
+import { makeAuthorize, PERMESSI as P } from "../../identity/index.js";
 
-const AZIONI_NOTIFICATIONS = new Set([
-  "pushSubs", "deletePushSub", "telegramSubs", "deleteTelegramSub", "broadcastPush",
-]);
-
-export function authorize(claims, action) {
-  if (!AZIONI_NOTIFICATIONS.has(action)) return null;
-  if (!claims) return false;
-  return isSysadmin(claims);
-}
+export const authorize = makeAuthorize({
+  pushSubs: P.NOTIFICATIONS_MANAGE, deletePushSub: P.NOTIFICATIONS_MANAGE,
+  telegramSubs: P.NOTIFICATIONS_MANAGE, deleteTelegramSub: P.NOTIFICATIONS_MANAGE,
+  broadcastPush: P.NOTIFICATIONS_MANAGE,
+});

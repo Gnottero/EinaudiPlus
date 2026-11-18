@@ -1,9 +1,9 @@
 // Superficie pubblica del modulo Grigliata — l'UNICO file che un altro
 // modulo o un adapter in api/ può importare.
 //
-// Dominio coperto: far partire una grigliata (delegato/sistemista), aderire
+// Dominio coperto: far partire una grigliata (delegato/admin), aderire
 // e dichiarare il pagamento (residenti, pubblico), confermare i pagamenti e
-// chiudere l'evento (delegato/sistemista).
+// chiudere l'evento (delegato/admin).
 //
 // Dipende da Notifications solo per avvisare una camera (notifyRoom) quando
 // un pagamento viene confermato — stessa dipendenza cross-modulo già vista
@@ -53,14 +53,14 @@ export async function usaTicket(room, ticketId) {
   return _usaTicket({ room, ticketId }, deps);
 }
 
-// ── Percorso amministrativo (delegato/sistemista) ────────────────────────────
+// ── Percorso amministrativo (delegato/admin) ────────────────────────────
 
 export async function adminCreaEvento(input) {
   return _adminCreaEvento(input, deps);
 }
 
-export async function adminOverview() {
-  return _adminOverview({}, deps);
+export async function adminOverview(sectionId) {
+  return _adminOverview({ sectionId }, deps);
 }
 
 export async function adminConfermaPagamento(adesioneId, attore) {

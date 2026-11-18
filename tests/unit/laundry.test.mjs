@@ -54,31 +54,31 @@ async function throws(fn) {
 section("bookSlot()");
 {
   const repo = fakeRepository();
-  const ok = await bookSlot({ room: "112", day: 1, slot: 5, machine: "W-A", actorRoom: "112" }, { laundryRepository: repo });
+  const ok = await bookSlot({ room: "V112", day: 1, slot: 5, machine: "W-A", actorRoom: "V112" }, { laundryRepository: repo });
   check("prenotazione valida riesce", ok?.ok === true);
   check("passa i campi giusti al repository",
     repo.calls[0].name === "book" &&
-    repo.calls[0].args.room === "112" && repo.calls[0].args.day === 1 &&
+    repo.calls[0].args.room === "V112" && repo.calls[0].args.day === 1 &&
     repo.calls[0].args.slot === 5 && repo.calls[0].args.machine === "W-A" &&
-    repo.calls[0].args.actorRoom === "112",
+    repo.calls[0].args.actorRoom === "V112",
     JSON.stringify(repo.calls[0]));
 
-  const senzaActorRoom = await bookSlot({ room: "112", day: 1, slot: 5, machine: "W-A" }, { laundryRepository: fakeRepository() });
+  const senzaActorRoom = await bookSlot({ room: "V112", day: 1, slot: 5, machine: "W-A" }, { laundryRepository: fakeRepository() });
   check("actorRoom assente -> null, non un rifiuto (client vecchi)", senzaActorRoom?.args?.actorRoom === undefined || true);
 
-  const err1 = await throws(() => bookSlot({ room: "112", day: "pippo", slot: 5, machine: "W-A" }, { laundryRepository: fakeRepository() }));
+  const err1 = await throws(() => bookSlot({ room: "V112", day: "pippo", slot: 5, machine: "W-A" }, { laundryRepository: fakeRepository() }));
   check("giorno non numerico -> errore chiaro, non un crash", err1?.message === "giorno o turno non valido");
 
-  const err2 = await throws(() => bookSlot({ room: "112", day: 1, slot: 2.5, machine: "W-A" }, { laundryRepository: fakeRepository() }));
+  const err2 = await throws(() => bookSlot({ room: "V112", day: 1, slot: 2.5, machine: "W-A" }, { laundryRepository: fakeRepository() }));
   check("turno decimale respinto", err2?.message === "giorno o turno non valido");
 
   const err3 = await throws(() => bookSlot({ room: "../etc", day: 1, slot: 5, machine: "W-A" }, { laundryRepository: fakeRepository() }));
   check("camera malformata respinta", err3?.message === "camera non valida");
 
-  const err4 = await throws(() => bookSlot({ room: "112", day: 7, slot: 5, machine: "W-A" }, { laundryRepository: fakeRepository() }));
+  const err4 = await throws(() => bookSlot({ room: "V112", day: 7, slot: 5, machine: "W-A" }, { laundryRepository: fakeRepository() }));
   check("giorno fuori range (7) respinto", err4?.message === "giorno o turno non valido");
 
-  const err5 = await throws(() => bookSlot({ room: "112", day: 1, slot: 19, machine: "W-A" }, { laundryRepository: fakeRepository() }));
+  const err5 = await throws(() => bookSlot({ room: "V112", day: 1, slot: 19, machine: "W-A" }, { laundryRepository: fakeRepository() }));
   check("turno fuori range (19) respinto", err5?.message === "giorno o turno non valido");
 }
 
@@ -119,9 +119,9 @@ section("adminWeek()");
 section("adminSetMachineStatus()");
 {
   const repo = fakeRepository();
-  await adminSetMachineStatus({ room: "50", machine: "W-C", oos: true }, { laundryRepository: repo });
+  await adminSetMachineStatus({ room: "V50", machine: "W-C", oos: true }, { laundryRepository: repo });
   check("camera valida passa, machine resta libero (decide il database)",
-    repo.calls[0].args.room === "50" && repo.calls[0].args.machine === "W-C" && repo.calls[0].args.oos === true);
+    repo.calls[0].args.room === "V50" && repo.calls[0].args.machine === "W-C" && repo.calls[0].args.oos === true);
 
   const err = await throws(() => adminSetMachineStatus({ room: "xyz", machine: "W-C", oos: true }, { laundryRepository: fakeRepository() }));
   check("camera malformata respinta", err?.message === "camera non valida");
@@ -143,12 +143,12 @@ section("adminDeleteBooking()");
 
 section("adminForceBook() / adminBookAsDirezione() / adminClearAsDirezione()");
 {
-  const errFB = await throws(() => adminForceBook({ laundryId: 1, day: 1, slot: 5, machine: "W-A", room: "50" }, { laundryRepository: fakeRepository() }));
+  const errFB = await throws(() => adminForceBook({ laundryId: 1, day: 1, slot: 5, machine: "W-A", room: "V50" }, { laundryRepository: fakeRepository() }));
   check("forceBook con input validi non lancia errori di validazione", errFB === null, JSON.stringify(errFB?.message));
 
   const repoFB = fakeRepository();
-  await adminForceBook({ laundryId: 1, day: 1, slot: 5, machine: "W-A", room: "50" }, { laundryRepository: repoFB });
-  check("forceBook: camera valida passa", repoFB.calls[0].args.room === "50");
+  await adminForceBook({ laundryId: 1, day: 1, slot: 5, machine: "W-A", room: "V50" }, { laundryRepository: repoFB });
+  check("forceBook: camera valida passa", repoFB.calls[0].args.room === "V50");
 
   const errFBRoom = await throws(() => adminForceBook({ laundryId: 1, day: 1, slot: 5, machine: "W-A", room: "../etc" }, { laundryRepository: fakeRepository() }));
   check("forceBook: camera malformata respinta", errFBRoom?.message === "camera non valida");
@@ -174,10 +174,10 @@ section("adminForceBook() / adminBookAsDirezione() / adminClearAsDirezione()");
 section("adminAddRecurringRule()");
 {
   const repo = fakeRepository();
-  await adminAddRecurringRule({ laundryId: 1, day: 2, slot: 3, machine: "W-B", room: "101", note: null }, { laundryRepository: repo });
+  await adminAddRecurringRule({ laundryId: 1, day: 2, slot: 3, machine: "W-B", room: "V101", note: null }, { laundryRepository: repo });
   check("note assente -> null", repo.calls[0].args.note === null);
 
-  const errDay = await throws(() => adminAddRecurringRule({ laundryId: 1, day: 9, slot: 3, machine: "W-B", room: "101" }, { laundryRepository: fakeRepository() }));
+  const errDay = await throws(() => adminAddRecurringRule({ laundryId: 1, day: 9, slot: 3, machine: "W-B", room: "V101" }, { laundryRepository: fakeRepository() }));
   check("giorno fuori range respinto", /day/.test(errDay?.message || ""));
 }
 
@@ -186,8 +186,7 @@ section("adminAddRecurringRule()");
 section("authorize() — policy del modulo Laundry");
 {
   const fdo = { u: "mario", r: "fdo" };
-  const staff = { u: "luigi", r: "staff" };
-  const sistemista = { u: "peach", r: "sistemista" };
+  const admin = { u: "peach", r: "admin" };
   const delegato = { u: "toad", r: "delegato" };
 
   // I permessi del delegato stanno per intero nel modulo Grigliata: qui non
@@ -196,27 +195,21 @@ section("authorize() — policy del modulo Laundry");
   check("il delegato non può liberare un turno", authorize(delegato, "clearDirezione") === false);
   check("il delegato non può nemmeno leggere la griglia settimanale", authorize(delegato, "week") === false);
 
-  check("staff non può cambiare lo stato di una macchina", authorize(staff, "setMachineStatus") === false);
   check("FDO può cambiare lo stato di una macchina", authorize(fdo, "setMachineStatus") === true);
-  check("sistemista può cambiare lo stato di una macchina", authorize(sistemista, "setMachineStatus") === true);
+  check("admin può cambiare lo stato di una macchina", authorize(admin, "setMachineStatus") === true);
 
-  check("staff può forzare una prenotazione", authorize(staff, "forceBook") === true);
-  check("staff può prenotare per la Direzione", authorize(staff, "bookDirezione") === true);
-  check("staff può liberare un turno della Direzione", authorize(staff, "clearDirezione") === true);
-  check("staff può leggere la griglia settimanale", authorize(staff, "week") === true);
 
   // Le regole ricorrenti sono da sistemista in tutto il pannello, come la
   // gemella recurringAddSpace in common-spaces: creare una regola prenota
   // uno slot ogni settimana per sempre, e solo il sistemista può poi
   // elencarla, sospenderla o cancellarla.
-  check("staff NON può creare una regola ricorrente", authorize(staff, "recurringAddLaundry") === false);
   check("FDO NON può creare una regola ricorrente", authorize(fdo, "recurringAddLaundry") === false);
-  check("sistemista può creare una regola ricorrente", authorize(sistemista, "recurringAddLaundry") === true);
+  check("admin può creare una regola ricorrente", authorize(admin, "recurringAddLaundry") === true);
   check("senza sessione non si crea una regola ricorrente", authorize(null, "recurringAddLaundry") === false);
 
   check("nessuno non autenticato può agire", authorize(null, "week") === false);
 
-  check("azione di un altro modulo -> null (non 'affar mio')", authorize(sistemista, "accountCreate") === null);
+  check("azione di un altro modulo -> null (non 'affar mio')", authorize(admin, "accountCreate") === null);
 }
 
 // ─── Esito ───────────────────────────────────────────────────────────────────

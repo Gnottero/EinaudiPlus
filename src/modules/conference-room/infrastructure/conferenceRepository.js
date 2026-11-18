@@ -1,16 +1,17 @@
 import { rpc } from "../../../shared/db/rpcClient.js";
 
 export const conferenceRepository = {
-  async agenda(giorni) {
-    return rpc("conference_agenda", { p_giorni: giorni });
+  async agenda(giorni, sectionId) {
+    return rpc("conference_agenda", { p_giorni: giorni, p_section_id: sectionId });
   },
-  async rules() {
-    return rpc("conference_rules");
+  async rules(sectionId) {
+    return rpc("conference_rules", { p_section_id: sectionId });
   },
-  async add({ titolo, oraInizio, oraFine, dal, al, giornoSettimana, note, attore }) {
+  async add({ titolo, oraInizio, oraFine, dal, al, giornoSettimana, note, attore, sectionId }) {
     return rpc("conference_add", {
       p_titolo: titolo, p_ora_inizio: oraInizio, p_ora_fine: oraFine,
       p_dal: dal, p_al: al, p_giorno_settimana: giornoSettimana, p_note: note, p_attore: attore,
+      p_section_id: sectionId,
     });
   },
   async update({ id, titolo, oraInizio, oraFine, dal, al, giornoSettimana, note }) {

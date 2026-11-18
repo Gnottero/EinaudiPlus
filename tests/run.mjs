@@ -36,7 +36,8 @@ const adminData = (await imp("api/admin/data.js")).default;
 
 const IP = `198.51.100.${1 + Math.floor(Math.random() * 250)}`;
 const SLOT = 1 + Math.floor(Math.random() * 17);
-const ROOM = String(200 + Math.floor(Math.random() * 700));
+// Camera casuale valida (sezione V, piani 1-5, camere 01-36): le camere ora portano la lettera di sezione.
+const ROOM = "V" + (1 + Math.floor(Math.random() * 5)) + String(1 + Math.floor(Math.random() * 36)).padStart(2, "0");
 const TOKEN = process.env.APP_TOKEN;
 
 function mkRes() {
@@ -72,14 +73,14 @@ const section = (s) => console.log(`\n── ${s} ${"─".repeat(Math.max(0, 60 
 
 section("Snapshot");
 {
-  const r = await call(laundry, { method: "GET", query: { token: TOKEN, room: "112" } });
+  const r = await call(laundry, { method: "GET", query: { token: TOKEN, room: "V112" } });
   check("HTTP 200", r.status === 200, `ricevuto ${r.status}`);
   check("slots = 19", r.body?.slots === 19);
   check("week ha 7 giorni", Object.keys(r.body?.week || {}).length === 7);
   check("status ha 6 macchine", Object.keys(r.body?.status || {}).length === 6);
   check("risposta non cacheabile", r.headers["Cache-Control"] === "no-store");
 
-  const s = await call(laundry, { method: "GET", query: { token: TOKEN, room: "42" } });
+  const s = await call(laundry, { method: "GET", query: { token: TOKEN, room: "V42" } });
   // Si assertisce solo su cio' che e' configurazione. Che W-A e D-A siano
   // "ok" NON e' verificabile: un amministratore puo' legittimamente segnarle
   // guaste in qualsiasi momento, e il test fallirebbe senza che nulla sia rotto.
@@ -98,7 +99,7 @@ section("Snapshot");
 section("Token");
 {
   check("GET con token errato -> 401",
-    (await call(laundry, { method: "GET", query: { token: "no", room: "112" } })).status === 401);
+    (await call(laundry, { method: "GET", query: { token: "no", room: "V112" } })).status === 401);
   check("POST con token errato -> 401",
     (await call(laundry, { body: { token: "no", action: "book" } })).status === 401);
 }
@@ -109,7 +110,7 @@ section("Prenotazioni");
   check("prenota", b1.body?.ok === true, JSON.stringify(b1.body).slice(0, 120));
   check("torna la settimana aggiornata", b1.body?.week?.["1"]?.[String(SLOT)]?.["W-A"] === ROOM);
 
-  const b2 = await call(laundry, { body: { token: TOKEN, action: "book", day: 1, slot: SLOT, machine: "W-A", room: "999" } });
+  const b2 = await call(laundry, { body: { token: TOKEN, action: "book", day: 1, slot: SLOT, machine: "W-A", room: "V536" } });
   check("conflitto -> 'occupata'", b2.body?.error === "occupata");
   check("conflitto -> dice chi ha lo slot", b2.body?.by === ROOM);
 
@@ -131,15 +132,15 @@ section("Fuori servizio riservato agli admin");
 section("Push e segnalazioni");
 {
   const ep = "https://fcm.googleapis.com/fcm/send/TEST-" + Math.random().toString(36).slice(2);
-  const s = await call(laundry, { body: { token: TOKEN, action: "subscribe", room: "112", sub: { endpoint: ep, keys: { p256dh: "k", auth: "a" } } } });
+  const s = await call(laundry, { body: { token: TOKEN, action: "subscribe", room: "V112", sub: { endpoint: ep, keys: { p256dh: "k", auth: "a" } } } });
   check("subscribe", s.body?.ok === true);
   check("subscribe ripetuta = aggiornamento",
-    (await call(laundry, { body: { token: TOKEN, action: "subscribe", room: "113", sub: { endpoint: ep, keys: { p256dh: "k", auth: "a" } } } })).body?.ok === true);
+    (await call(laundry, { body: { token: TOKEN, action: "subscribe", room: "V113", sub: { endpoint: ep, keys: { p256dh: "k", auth: "a" } } } })).body?.ok === true);
   check("unsubscribe",
     (await call(laundry, { body: { token: TOKEN, action: "unsubscribe", endpoint: ep } })).body?.ok === true);
 
-  check("feedback", (await call(laundry, { body: { token: TOKEN, action: "feedback", room: "112", text: "prova" } })).body?.ok === true);
-  check("feedback vuoto respinto", (await call(laundry, { body: { token: TOKEN, action: "feedback", room: "112", text: "  " } })).body?.ok === false);
+  check("feedback", (await call(laundry, { body: { token: TOKEN, action: "feedback", room: "V112", text: "prova" } })).body?.ok === true);
+  check("feedback vuoto respinto", (await call(laundry, { body: { token: TOKEN, action: "feedback", room: "V112", text: "  " } })).body?.ok === false);
   check("azione sconosciuta", (await call(laundry, { body: { token: TOKEN, action: "pippo" } })).body?.error === "azione sconosciuta");
   check("metodo non ammesso -> 405", (await call(laundry, { method: "DELETE", query: { token: TOKEN } })).status === 405);
 
@@ -147,7 +148,7 @@ section("Push e segnalazioni");
   // finivano contro un vincolo NOT NULL: il client riceveva 500 "errore del
   // server" per un campo scritto male, che e' un invito a insistere.
   const nonNum = await call(laundry, {
-    body: { token: TOKEN, action: "book", day: "pippo", slot: "x", machine: "W-A", room: "112" },
+    body: { token: TOKEN, action: "book", day: "pippo", slot: "x", machine: "W-A", room: "V112" },
   });
   // Lo status non è più necessariamente 200: gli errori di validazione dal
   // modulo Laundry portano il proprio status HTTP (400), coerente con come
@@ -159,7 +160,7 @@ section("Push e segnalazioni");
     JSON.stringify(nonNum.body));
 
   check("turno decimale respinto",
-    (await call(laundry, { body: { token: TOKEN, action: "book", day: 1, slot: 2.5, machine: "W-A", room: "112" } }))
+    (await call(laundry, { body: { token: TOKEN, action: "book", day: 1, slot: 2.5, machine: "W-A", room: "V112" } }))
       .body?.error === "giorno o turno non valido");
 
   check("camera malformata respinta",
@@ -173,7 +174,7 @@ section("Push e segnalazioni");
   check("endpoint push arbitrario respinto",
     (await call(laundry, {
       body: {
-        token: TOKEN, action: "subscribe", room: "112",
+        token: TOKEN, action: "subscribe", room: "V112",
         sub: { endpoint: "http://169.254.169.254/latest/meta-data", keys: { p256dh: "a", auth: "b" } },
       },
     })).body?.error === "endpoint di notifica non riconosciuto");
@@ -392,7 +393,7 @@ let fdoUsaEGetta = null;  // { id, username, password }
     const nome = "zz-test-" + Math.random().toString(36).slice(2, 8);
     const pw = "Prova-" + Math.random().toString(36).slice(2, 12);
     const creato = await call(adminData, {
-      body: { action: "accountCreate", username: nome, password: pw, ruolo: "fdo" },
+      body: { action: "accountCreate", username: nome, password: pw, ruolo: "fdo", section_id: 1 },
       cookie: sysCookie,
     });
     check("il sistemista crea un account fdo", creato.body?.ok === true, JSON.stringify(creato.body));
@@ -458,7 +459,7 @@ section("Operazioni admin");
     check("panoramica", ov.body?.laundries?.length === 2);
     check("griglia settimana", (await call(adminData, { body: { action: "week", laundry_id: 1, offset: 0 }, cookie })).body?.ok === true);
 
-    const s1 = await call(adminData, { body: { action: "setMachineStatus", room: "100", machine: "W-C", oos: true }, cookie });
+    const s1 = await call(adminData, { body: { action: "setMachineStatus", room: "V101", machine: "W-C", oos: true }, cookie });
     check("mette fuori servizio", s1.body?.status?.["W-C"] === "oos");
 
     // Uno slot LIBERO davvero, letto dalla griglia, invece di uno a caso.
@@ -489,7 +490,7 @@ section("Operazioni admin");
     }
 
     check("rimette in servizio",
-      (await call(adminData, { body: { action: "setMachineStatus", room: "100", machine: "W-C", oos: false }, cookie })).body?.status?.["W-C"] === "ok");
+      (await call(adminData, { body: { action: "setMachineStatus", room: "V101", machine: "W-C", oos: false }, cookie })).body?.status?.["W-C"] === "ok");
 
     check("lista segnalazioni", (await call(adminData, { body: { action: "feedback" }, cookie })).body?.ok === true);
     check("lista sale", (await call(adminData, { body: { action: "spaces" }, cookie })).body?.ok === true);
@@ -555,7 +556,7 @@ section("Sistemista");
     check("crea una regola ricorrente", add.body?.ok === true, JSON.stringify(add.body));
 
     const dup = await call(adminData, {
-      body: { action: "recurringAddLaundry", laundry_id: 1, day: 2, slot: slotLibero, machine: "W-B", room: "999" },
+      body: { action: "recurringAddLaundry", laundry_id: 1, day: 2, slot: slotLibero, machine: "W-B", room: "V536" },
       cookie: sysCookie,
     });
     check("due regole sullo stesso turno respinte", dup.body?.ok === false, JSON.stringify(dup.body));
@@ -677,7 +678,7 @@ section("Sistemista");
 
 section("Telegram");
 {
-  const gen = await call(laundry, { body: { token: TOKEN, action: "telegramCode", room: "318" } });
+  const gen = await call(laundry, { body: { token: TOKEN, action: "telegramCode", room: "V318" } });
   const code = gen.body?.code;
   check("codice generato", /^[A-Z0-9]{8}$/.test(code || ""), JSON.stringify(gen.body));
   check("senza vocali", !/[AEIOU]/.test(code || ""), code);

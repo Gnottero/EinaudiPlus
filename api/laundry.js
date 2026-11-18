@@ -22,6 +22,7 @@ import { subscribePush, unsubscribePush, createTelegramCode } from "../src/modul
 import { submitFeedback } from "../src/modules/feedback/index.js";
 import { getBike, setBike } from "../src/modules/bikes/index.js";
 import { getNotifyPref as getLinenNotifyPref, setNotifyPref as setLinenNotifyPref } from "../src/modules/linen-change/index.js";
+import { assertRoomAllowed, getConfig as getSectionConfig } from "../src/modules/sections/index.js";
 import { wrapHandler } from "../src/shared/errors/wrapHandler.js";
 
 export default wrapHandler("laundry", async (req, res) => {
@@ -50,6 +51,12 @@ export default wrapHandler("laundry", async (req, res) => {
     if (!(await checkRateLimit("laundry-read", clientIp(req), 600, 600))) {
       return fail(res, "troppe richieste, riprova fra poco", {}, 429);
     }
+    // La configurazione pubblica (sezioni, intervalli, funzionalita' accese,
+    // lavanderie): il client la legge all'avvio per sapere quali camere sono
+    // valide e quali schede mostrare. Vive qui e non in un endpoint a parte
+    // per non aggiungere una funzione serverless (il piano Hobby ne ammette 12).
+    if (req.query.config) return json(res, 200, await getSectionConfig());
+
     const room = (req.query.room || "").toString().trim();
     // Senza camera si ricade sulla lavanderia principale — invariato, decide
     // laundry_for_room() in SQL, non questo file.
@@ -62,6 +69,21 @@ export default wrapHandler("laundry", async (req, res) => {
 
   if (!(await checkRateLimit("laundry", clientIp(req), 60, 600))) {
     return fail(res, "troppe richieste, riprova fra poco", {}, 429);
+  }
+
+  // Ogni azione legata a una camera passa da qui: la camera deve esistere in
+  // una sezione, e la sezione deve avere acceso quel pezzo dell'app.
+  // `unsubscribe` e il resto senza camera restano fuori.
+  const FEATURE_PER_AZIONE = {
+    book: "laundry", clear: "laundry",
+    subscribe: "notifications", telegramCode: "notifications",
+    feedback: "feedback", bikeGet: "bikes", bikeSet: "bikes",
+    linenNotifyGet: "linen", linenNotifySet: "linen",
+  };
+  if (FEATURE_PER_AZIONE[action]) {
+    await assertRoomAllowed(room, FEATURE_PER_AZIONE[action]);
+    // Chi agisce per conto di un'altra camera deve esistere anch'esso.
+    if (body.actor_room) await assertRoomAllowed(String(body.actor_room), "laundry", { required: false });
   }
 
   switch (action) {

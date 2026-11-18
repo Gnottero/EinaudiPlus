@@ -13,7 +13,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Flame, Loader2, AlertTriangle, Check, ExternalLink, Ticket, ChevronsRight, Lock } from "lucide-react";
 import * as api from "../../api";
-import type { Lang } from "../../i18n";
+import { T as T_APP, isFeatureOffError, type Lang } from "../../i18n";
 import { EMOJI_TICKET_DEFAULT } from "./emojiTicket";
 import { useAvvisiInTempoReale } from "../../realtime";
 
@@ -444,6 +444,7 @@ export default function GrigliataView({ lang, roomNumber }: { lang: Lang; roomNu
   const [stato, setStato] = useState<api.GrigliataStato | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const [spenta, setSpenta] = useState(false);   // 403: funzione spenta dalla sezione
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   // Lo slider portato in fondo apre una schermata a tutto schermo con
@@ -477,7 +478,7 @@ export default function GrigliataView({ lang, roomNumber }: { lang: Lang; roomNu
     setError(false);
     try {
       setStato(await api.getGrigliataStato());
-    } catch { setError(true); }
+    } catch (e) { setError(true); setSpenta(isFeatureOffError(e)); }
     finally { setLoading(false); }
   }, [camera]);
 
@@ -598,7 +599,7 @@ export default function GrigliataView({ lang, roomNumber }: { lang: Lang; roomNu
     return (
       <div className="flex-1 flex flex-col items-center justify-center gap-3 px-8 text-center" style={{ color: sub }}>
         <AlertTriangle size={26} style={{ color: "var(--destructive)" }} />
-        <p className="text-sm">{t.netError}</p>
+        <p className="text-sm">{spenta ? T_APP[lang].funzioneNonAttiva : t.netError}</p>
         <button onClick={load} className="rounded-xl px-4 py-2 text-sm font-semibold" style={{ background: RED, color: RED_FG }}>
           {t.retry}
         </button>

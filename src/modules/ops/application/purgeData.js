@@ -4,6 +4,7 @@
 // rifiutare una sala inventata anche a chi chiama senza passare dal
 // pannello.
 
-export async function purgeData({ scope, sala }, { opsRepository }) {
-  return opsRepository.purge({ scope: String(scope || ""), sala: sala ? String(sala) : null });
+import { optionalSectionId } from "../../../shared/validation/section.js";
+export async function purgeData({ scope, sala, sectionId = null }, { opsRepository }) {
+  return opsRepository.purge({ scope: String(scope || ""), sala: sala ? String(sala) : null, sectionId: optionalSectionId(sectionId) });
 }

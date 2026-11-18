@@ -7,6 +7,7 @@
 // lavanderia.
 
 import { useState, useEffect } from "react";
+import { useFeature } from "./hooks";
 import {
   X, ChevronRight, Globe, Bell, BellRing, Download, Eye, ShieldCheck,
   Send, Share, Menu, CheckCircle2, FileText, SunMoon, Sun, Moon, Monitor, Bed,
@@ -19,7 +20,7 @@ import type { Role as AdminRole } from "./AdminPanel";
 
 /** Come si chiama un ruolo quando lo si mostra a chi ha fatto l'accesso. */
 const etichettaRuolo = (r: AdminRole | null) =>
-  r === "sistemista" ? "sistemista" : r === "staff" ? "staff" : r === "delegato" ? "delegato" : "FDO";
+  r === "superadmin" ? "superadmin" : r === "admin" ? "admin" : r === "delegato" ? "delegato" : "FDO";
 
 // ─── Toast ───────────────────────────────────────────────────────────────────
 //
@@ -109,12 +110,17 @@ export function SettingsSheet({ lang, room, adminRole, onLang, temaPref, onTema,
   const standalone = typeof window !== "undefined" &&
     (window.matchMedia("(display-mode: standalone)").matches || (navigator as any).standalone === true);
 
+  // Le funzionalita' che la sezione di questa camera ha spento spariscono
+  // dalle Impostazioni (il server le rifiuterebbe comunque).
+  const notifOn = useFeature("notifications");
+  const linenOn = useFeature("linen");
+
   useEffect(() => { push.getReminderState().then(setReminderState); }, []);
 
   useEffect(() => {
-    if (!room) return;
+    if (!room || !linenOn) return;
     api.getLinenNotifyPref(room).then(setLinenPref).catch(() => { /* resta il default: si può comunque cambiare */ });
-  }, [room]);
+  }, [room, linenOn]);
 
   async function cambiaLinenPref(parziale: Partial<api.LinenNotifyPref>) {
     if (!room || linenBusy) return;
@@ -225,14 +231,14 @@ export function SettingsSheet({ lang, room, adminRole, onLang, temaPref, onTema,
               </div>
             )}
           </div>
-          {room && (
+          {room && notifOn && (
             <div style={{ borderBottom:`1px solid ${div}` }}>
               <Row icon={reminderState==="on" ? <BellRing size={18}/> : <Bell size={18}/>}
                 label={T[lang].notificheTurni} sub={reminderSub}
                 onClick={() => setRemindersOpen(true)}/>
             </div>
           )}
-          {room && (
+          {room && linenOn && (
             <div style={{ borderBottom:`1px solid ${div}` }}>
               <Row icon={<Bed size={18}/>} label={T[lang].notificheCambioBiancheria}
                 sub={linenPref.enabled ? T[lang].attive : T[lang].nonAttive}
@@ -279,7 +285,7 @@ export function SettingsSheet({ lang, room, adminRole, onLang, temaPref, onTema,
         </div>
 
         {/* Né l'accesso né l'uscita stanno qui.
-            L'accesso si apre digitando 1935 al posto della camera: una voce di
+            L'accesso sta all'indirizzo /admin: una voce di
             menu che il 99% di chi lo apre non può usare sarebbe solo rumore.
             L'uscita è il pulsante della camera in alto — toccarlo chiude la
             sessione e riporta alla scelta della stanza. Un solo posto, quello

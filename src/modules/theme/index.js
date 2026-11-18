@@ -2,7 +2,7 @@
 // un adapter in api/ può importare.
 //
 // Dominio coperto: lettura/scrittura del tema stagionale attivo, entrambe
-// azioni del pannello admin (sistemista). La lettura lato residenti non
+// azioni del pannello admin (admin). La lettura lato residenti non
 // passa da qui: è già inclusa nella risposta di laundry_snapshot (il campo
 // `tema`), letta dal modulo Laundry — nessun endpoint separato da duplicare.
 
@@ -15,10 +15,10 @@ export { TEMI, isValidTheme } from "./domain/theme.js";
 
 const deps = { themeRepository };
 
-export async function getTheme() {
-  return _getTheme({}, deps);
+export async function getTheme(sectionId) {
+  return _getTheme({ sectionId }, deps);
 }
 
-export async function setTheme(tema) {
-  return _setTheme({ tema }, deps);
+export async function setTheme(tema, sectionId) {
+  return _setTheme({ tema, sectionId }, deps);
 }

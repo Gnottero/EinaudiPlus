@@ -25,28 +25,28 @@ export const notificationsRepository = {
     return rpc("telegram_unlink", { p_chat_id: chatId });
   },
 
-  async adminListPushSubs() {
-    return rpc("sysadmin_push_subs");
+  async adminListPushSubs(sectionId = null) {
+    return rpc("sysadmin_push_subs", { p_section_id: sectionId });
   },
 
   async adminDeletePushSub({ id }) {
     return rpc("sysadmin_delete_push_sub", { p_id: id });
   },
 
-  async adminListTelegramSubs() {
-    return rpc("sysadmin_telegram_subs");
+  async adminListTelegramSubs(sectionId = null) {
+    return rpc("sysadmin_telegram_subs", { p_section_id: sectionId });
   },
 
   async adminDeleteTelegramSub({ id }) {
     return rpc("sysadmin_delete_telegram_sub", { p_id: id });
   },
 
-  async allPushSubs({ room }) {
-    return rpc("sysadmin_all_push_subs", { p_room: room });
+  async allPushSubs({ room, sectionId = null }) {
+    return rpc("sysadmin_all_push_subs", { p_room: room, p_section_id: sectionId });
   },
 
-  async allTelegramSubs({ room }) {
-    return rpc("sysadmin_all_telegram_subs", { p_room: room });
+  async allTelegramSubs({ room, sectionId = null }) {
+    return rpc("sysadmin_all_telegram_subs", { p_room: room, p_section_id: sectionId });
   },
 
   async prunePushSubs({ ids }) {

@@ -1,10 +1,11 @@
 // Use-case: prenotazione pubblica di una fascia oraria in una sala comune.
 
+import { requireSectionId } from "../../../shared/validation/section.js";
 import { ValidationError } from "../../../shared/errors/AppError.js";
 import { parseIntInRange } from "../../../shared/validation/number.js";
 import { isValidSpace, DAY_MIN, DAY_MAX, START_MIN, START_MAX, END_MIN, END_MAX } from "../domain/spaces.js";
 
-export async function bookSpace({ space, day, start, end, name, type }, { commonSpacesRepository }) {
+export async function bookSpace({ space, day, start, end, name, type, sectionId }, { commonSpacesRepository }) {
   const slug = String(space || "").trim();
   if (!isValidSpace(slug)) throw new ValidationError("sala non valida");
 
@@ -14,7 +15,7 @@ export async function bookSpace({ space, day, start, end, name, type }, { common
   if (d === null || s === null || e === null) throw new ValidationError("giorno o orario non valido");
 
   return commonSpacesRepository.book({
-    space: slug, day: d, start: s, end: e,
+    sectionId: requireSectionId(sectionId), space: slug, day: d, start: s, end: e,
     name: String(name || ""),
     // `type` vale solo per il cinema; per la musica il database lo ignora
     // (vedi commento originale in api/rooms.js) — nessuna restrizione per

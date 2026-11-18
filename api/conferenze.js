@@ -10,6 +10,7 @@
 import { json, fail, botFilterTokenOk, methodOk } from "./_lib/http.js";
 import { checkRateLimit, clientIp } from "../src/shared/http/rateLimit.js";
 import { getAgenda } from "../src/modules/conference-room/index.js";
+import { resolveResourceSection } from "../src/modules/sections/index.js";
 import { wrapHandler } from "../src/shared/errors/wrapHandler.js";
 
 export default wrapHandler("conferenze", async (req, res) => {
@@ -20,5 +21,14 @@ export default wrapHandler("conferenze", async (req, res) => {
     return fail(res, "troppe richieste, riprova fra poco", {}, 429);
   }
 
-  return json(res, 200, await getAgenda(req.query.giorni));
+  // La sezione di chi guarda deve avere acceso l'agenda della sala polivalente.
+  // La camera e' obbligatoria: la sala polivalente e' di una sezione (o di
+  // quella con cui la condivide). La Direzione manda DIREZIONE + `section`.
+  const sectionId = await resolveResourceSection({
+    room: String(req.query.room || "").trim(),
+    sectionCode: String(req.query.section || "").trim(),
+    feature: "conference",
+  });
+
+  return json(res, 200, await getAgenda(req.query.giorni, sectionId));
 });

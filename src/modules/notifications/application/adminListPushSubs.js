@@ -1,3 +1,4 @@
-export async function adminListPushSubs(_input, { notificationsRepository }) {
-  return notificationsRepository.adminListPushSubs();
+import { optionalSectionId } from "../../../shared/validation/section.js";
+export async function adminListPushSubs({ sectionId = null } = {}, { notificationsRepository }) {
+  return notificationsRepository.adminListPushSubs(optionalSectionId(sectionId));
 }

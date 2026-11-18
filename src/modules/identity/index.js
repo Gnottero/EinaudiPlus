@@ -14,6 +14,9 @@ import {
   clearSessionCookie as _clearSessionCookie,
   readSessionCookie,
 } from "./infrastructure/sessionCookie.js";
+import { verifyTurnstile } from "./infrastructure/turnstileVerifier.js";
+import { verifyAntibot as _verifyAntibot } from "./application/verifyAntibot.js";
+import { createLogger } from "../../shared/logging/logger.js";
 import { authenticate as _authenticate } from "./application/authenticate.js";
 import { changeOwnPassword as _changeOwnPassword } from "./application/changeOwnPassword.js";
 import {
@@ -21,11 +24,13 @@ import {
   resetAccountPassword as _resetAccountPassword,
   setAccountActive as _setAccountActive,
   setAccountCamera as _setAccountCamera,
+  setAccountSection as _setAccountSection,
   deleteAccount as _deleteAccount,
   listAccounts as _listAccounts,
 } from "./application/manageAccounts.js";
 
-export { RUOLI, isValidRole, isSysadmin, isStaff, isDelegato, authorize } from "./domain/roles.js";
+export { RUOLI, RUOLI_DI_SEZIONE, isValidRole, isSuperadmin, isAdmin, isDelegato, authorize } from "./domain/roles.js";
+export { PERMESSI, RUOLI_PERMESSI, can, makeAuthorize, isGlobalScope, sectionAllowed } from "./domain/permissions.js";
 export { sessioneAncoraValida } from "./domain/sessionState.js";
 
 // Le dipendenze reali (repository su Supabase, hasher scrypt) sono cablate
@@ -33,6 +38,19 @@ export { sessioneAncoraValida } from "./domain/sessionState.js";
 // application/ direttamente, iniettando dipendenze finte — questo file serve
 // all'adapter HTTP, non ai test.
 const deps = { accountRepository, hasher };
+
+const antibotLogger = createLogger("identity/antibot");
+
+/** Cosa serve al browser per mostrare la verifica: { enabled, siteKey }. */
+export function antibotConfig() {
+  const enabled = Boolean(env.turnstileSecret && env.turnstileSiteKey);
+  return { enabled, siteKey: enabled ? env.turnstileSiteKey : null };
+}
+
+/** `token` e' quello prodotto dal widget Turnstile nel browser. */
+export async function verifyAntibot(token, ip) {
+  return _verifyAntibot({ token, ip }, { secret: env.turnstileSecret, verifier: verifyTurnstile, logger: antibotLogger });
+}
 
 export function adminConfigured() {
   return Boolean(env.adminSessionSecret);
@@ -67,8 +85,8 @@ export async function changeOwnPassword(username, currentPassword, newPassword) 
   return _changeOwnPassword({ username, currentPassword, newPassword }, deps);
 }
 
-export async function createAccount(username, password, ruolo, attore) {
-  return _createAccount({ username, password, ruolo, attore }, deps);
+export async function createAccount(username, password, ruolo, attore, sectionId = null) {
+  return _createAccount({ username, password, ruolo, attore, sectionId }, deps);
 }
 
 export async function resetAccountPassword(id, password) {
@@ -97,3 +115,8 @@ export async function accountByUsername(username) {
 
 export const hashPassword = hasher.hashPassword;
 export const verifyPassword = hasher.verifyPassword;
+
+/** Sposta un account in un'altra sezione (il superadmin non ne ha una). */
+export async function setAccountSection(id, sectionId) {
+  return _setAccountSection({ id, sectionId }, deps);
+}

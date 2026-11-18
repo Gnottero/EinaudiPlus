@@ -1,4 +1,5 @@
 import { useState, useEffect, memo } from "react";
+import { usePairs, useFeature } from "../../hooks";
 import { Plus, Trash2, Star, History, AlertTriangle, Wind, Bed } from "lucide-react";
 import { WashingMachine } from "../../icons";
 import { FavPicker } from "./FavPicker";
@@ -44,6 +45,9 @@ export const Dashboard = memo(function Dashboard({ lang, week, status, roomNumbe
   cambioBiancheria: api.CambioBiancheria;
 }) {
   const t = T[lang];
+  const pairs = usePairs();
+  // La sezione puo' aver spento il cambio biancheria: niente card.
+  const linenOn = useFeature("linen");
   const [now, setNow]           = useState(new Date());
   const [toast, setToast]       = useState<string | null>(null);
   const [toastUndo, setToastUndo] = useState<(() => void) | null>(null);
@@ -84,9 +88,9 @@ export const Dashboard = memo(function Dashboard({ lang, week, status, roomNumbe
   // Ricalcolato a ogni tick di `now` (lo stesso stato che guida il conto alla
   // rovescia sopra): il blocco deve sparire da solo alle 14:00 senza bisogno
   // di una ricarica, esattamente come `ultimoMinuto` non ne richiede una.
-  const mostraCambioBiancheria = finestraCambioBiancheriaAttiva(now) && cambioBiancheria !== null;
+  const mostraCambioBiancheria = finestraCambioBiancheriaAttiva(now) && cambioBiancheria !== null && linenOn;
 
-  const machines = deriveMachines(week, status, TODAY_DOW, CUR_SLOT, roomNumber);
+  const machines = deriveMachines(week, status, TODAY_DOW, CUR_SLOT, pairs);
 
   const myBookings     = myWeekBookings(week, roomNumber);
   // La quota è "per camera": la Direzione non è una camera e il server non
@@ -106,7 +110,7 @@ export const Dashboard = memo(function Dashboard({ lang, week, status, roomNumbe
 
   // Prima lavatrice libera in un dato (giorno, slot)
   const firstFreeWasherAt = (day: number, s: number): string | null => {
-    const washIds = machinesFor(roomNumber).washers;
+    const washIds = machinesFor(pairs).washers;
     return washIds.find((wid) => status[wid] !== "oos" && !week[day]?.[s]?.[wid]) ?? null;
   };
 
@@ -238,7 +242,7 @@ export const Dashboard = memo(function Dashboard({ lang, week, status, roomNumbe
             Testo e icone piu' grandi di prima, e "chi l'aveva prima" sta
             accanto allo stato sulla stessa riga invece che sotto. */}
         <div className="grid grid-cols-3 gap-2">
-          {machinesFor(roomNumber).washers.map((id) => id[2]).map((L) => {
+          {machinesFor(pairs).washers.map((id) => id[2]).map((L) => {
             const wm = washers.find((m) => m.label === L);
             const dm = dryers.find((m) => m.label === L);
             return (

@@ -8,7 +8,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { Bike, Loader2, AlertTriangle, Check } from "lucide-react";
 import * as api from "../../api";
-import type { Lang } from "../../i18n";
+import { T as T_APP, isFeatureOffError, type Lang } from "../../i18n";
 
 const RED = "var(--primary)", RED_FG = "var(--primary-foreground)";
 const fg = "var(--foreground)", sub = "var(--muted-foreground)";
@@ -228,6 +228,7 @@ export default function BiciView({ lang, roomNumber }: { lang: Lang; roomNumber:
   const [creatoDa, setCreatoDa] = useState<api.BikeSource | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const [spenta, setSpenta] = useState(false);   // 403: funzione spenta dalla sezione
   const [busy, setBusy] = useState(false);
   // Cambia solo quando la dichiarazione passa a "sì": rimontando <BiciSvg>
   // con una key diversa, l'animazione d'ingresso riparte da capo invece di
@@ -241,7 +242,7 @@ export default function BiciView({ lang, roomNumber }: { lang: Lang; roomNumber:
       const r = await api.getBike(camera);
       setHaBici(r.hasBike); setCreatoDa(r.creatoDa);
     }
-    catch { setError(true); }
+    catch (e) { setError(true); setSpenta(isFeatureOffError(e)); }
     finally { setLoading(false); }
   }, [camera]);
 
@@ -284,7 +285,7 @@ export default function BiciView({ lang, roomNumber }: { lang: Lang; roomNumber:
     return (
       <div className="flex-1 flex flex-col items-center justify-center gap-3 px-8 text-center" style={{ color: sub }}>
         <AlertTriangle size={26} style={{ color: "var(--destructive)" }} />
-        <p className="text-sm">{t.netError}</p>
+        <p className="text-sm">{spenta ? T_APP[lang].funzioneNonAttiva : t.netError}</p>
         <button onClick={load} className="rounded-xl px-4 py-2 text-sm font-semibold" style={{ background: RED, color: RED_FG }}>
           {t.retry}
         </button>

@@ -46,7 +46,7 @@ export default [
     languageOptions: {
       ecmaVersion: "latest",
       sourceType: "module",
-      globals: { process: "readonly", console: "readonly", Buffer: "readonly", URL: "readonly", setTimeout: "readonly", clearTimeout: "readonly", fetch: "readonly", AbortController: "readonly", TextEncoder: "readonly" },
+      globals: { process: "readonly", console: "readonly", Buffer: "readonly", URL: "readonly", setTimeout: "readonly", clearTimeout: "readonly", fetch: "readonly", AbortController: "readonly", TextEncoder: "readonly", URLSearchParams: "readonly" },
     },
     rules: {
       "no-unused-vars": ["error", { args: "none", caughtErrors: "none" }],

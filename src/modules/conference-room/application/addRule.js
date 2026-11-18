@@ -1,3 +1,4 @@
+import { requireSectionId } from "../../../shared/validation/section.js";
 import { ValidationError } from "../../../shared/errors/AppError.js";
 import { parseIntInRange } from "../../../shared/validation/number.js";
 import { GIORNO_MIN, GIORNO_MAX } from "../domain/rules.js";
@@ -11,12 +12,12 @@ function parseGiorno(giorno) {
   return parsed;
 }
 
-export async function addRule({ titolo, inizio, fine, dal, al, giorno, note, attore }, { conferenceRepository }) {
+export async function addRule({ titolo, inizio, fine, dal, al, giorno, note, attore, sectionId }, { conferenceRepository }) {
   return conferenceRepository.add({
     titolo: String(titolo || ""), oraInizio: String(inizio || ""), oraFine: String(fine || ""),
     dal: String(dal || ""), al: String(al || ""),
     giornoSettimana: parseGiorno(giorno),
     note: note ? String(note) : null,
-    attore,
+    attore, sectionId: requireSectionId(sectionId),
   });
 }

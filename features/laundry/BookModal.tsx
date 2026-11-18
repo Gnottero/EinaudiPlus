@@ -1,10 +1,11 @@
 import { useState, useEffect, useCallback } from "react";
 import { AlertTriangle, X, Delete, Wind } from "lucide-react";
 import { WashingMachine } from "../../icons";
-import { useTastieraFisica, TASTI_CAMERA } from "../../hooks";
+import { usePairs, useTastieraFisica, TASTI_CAMERA } from "../../hooks";
 import { useInvio } from "./hooks";
 import * as api from "../../api";
-import { TIME_SLOTS, TODAY_DOW, DAYS_DATE, monShort, nextRef, machinesFor, type WeekData, type StatusData } from "../../modello";
+import { TIME_SLOTS, TODAY_DOW, DAYS_DATE, monShort, nextRef, machinesFor, completeRoom, type WeekData, type StatusData } from "../../modello";
+import { parseRoom } from "../../sectionsApi";
 import { T, type Lang } from "../../i18n";
 import { RED, RED_FG, GREEN_T, OOS_C, OOS_T } from "../../tema";
 
@@ -18,10 +19,18 @@ export function BookModal({ target, bookings, status = {}, myRoom, lang, isAdmin
   onConfirm: (room: string) => void; onClose: () => void;
 }) {
   const t = T[lang];
+  const pairs = usePairs();
   const [selMachine, setSelMachine] = useState<string | null>(
     target.machineId !== "?" ? target.machineId : null
   );
-  const [room, setRoom] = useState(target.prefillRoom ?? "");
+  // Chi corregge una camera della propria sezione vede solo le cifre: la
+  // lettera di sezione si rimette da sola (vedi completeRoom).
+  const [typedRoom, setRoom] = useState(() => {
+    const pre = target.prefillRoom ?? "";
+    const own = parseRoom(myRoom), p = parseRoom(pre);
+    return own && p && own.code === p.code ? pre.slice(own.code.length) : pre;
+  });
+  const room = completeRoom(typedRoom, myRoom);
 
   // `prefillRoom` c'è solo quando si arriva da "Modifica stanza" su una
   // prenotazione che esiste già. Lì la domanda "per chi è?" è fuori luogo: la
@@ -75,7 +84,7 @@ export function BookModal({ target, bookings, status = {}, myRoom, lang, isAdmin
 
   // Ricominciando a scrivere l'avviso se ne va: il numero che l'aveva
   // provocato non è più quello sullo schermo.
-  useEffect(() => { setAvvisoLavanderia(false); }, [room]);
+  useEffect(() => { setAvvisoLavanderia(false); }, [typedRoom]);
 
   /** Avanti dal tastierino: o si prosegue, o si dice perché no. */
   function avanti() {
@@ -100,7 +109,7 @@ export function BookModal({ target, bookings, status = {}, myRoom, lang, isAdmin
     step === "input",
     setRoom,
     avanti,
-    4,
+    8,
     TASTI_CAMERA,
   );
 
@@ -142,7 +151,7 @@ export function BookModal({ target, bookings, status = {}, myRoom, lang, isAdmin
           <>
             <p className="text-sm font-semibold mb-3" style={{ color:fg }}>{t.chooseFree}</p>
             <div className="flex gap-3 mb-4">
-              {machinesFor(myRoom).washers.map((id) => {
+              {machinesFor(pairs).washers.map((id) => {
                 const isTaken = taken.has(id);
                 // Guasta la lavatrice, oppure l'asciugatrice che verrebbe
                 // riservata insieme: in entrambi i casi va segnalato qui.

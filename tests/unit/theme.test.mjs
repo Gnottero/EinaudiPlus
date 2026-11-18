@@ -34,7 +34,7 @@ async function throws(fn) {
 section("getTheme()");
 {
   const repo = fakeRepository("halloween");
-  const res = await getTheme({}, { themeRepository: repo });
+  const res = await getTheme({ sectionId: 1 }, { themeRepository: repo });
   check("legge il tema corrente", res.ok === true && res.tema === "halloween", JSON.stringify(res));
 }
 
@@ -43,21 +43,21 @@ section("getTheme()");
 section("setTheme()");
 {
   const repo = fakeRepository("nessuno");
-  await setTheme({ tema: "natale" }, { themeRepository: repo });
+  await setTheme({ sectionId: 1, tema: "natale" }, { themeRepository: repo });
   check("tema valido passa al repository", repo.calls[0].name === "set" && repo.calls[0].args === "natale");
 
   for (const tema of ["nessuno", "halloween", "natale"]) {
     const r = fakeRepository();
-    await setTheme({ tema }, { themeRepository: r });
+    await setTheme({ sectionId: 1, tema }, { themeRepository: r });
     check(`accetta '${tema}'`, r.calls[0]?.args === tema);
   }
 
   const repoInvalido = fakeRepository();
-  const err = await throws(() => setTheme({ tema: "capodanno" }, { themeRepository: repoInvalido }));
+  const err = await throws(() => setTheme({ sectionId: 1, tema: "capodanno" }, { themeRepository: repoInvalido }));
   check("tema non riconosciuto respinto", err?.message === "tema non valido");
   check("e non tocca il repository", repoInvalido.calls.length === 0);
 
-  const errVuoto = await throws(() => setTheme({ tema: "" }, { themeRepository: fakeRepository() }));
+  const errVuoto = await throws(() => setTheme({ sectionId: 1, tema: "" }, { themeRepository: fakeRepository() }));
   check("tema assente respinto", errVuoto?.message === "tema non valido");
 }
 
@@ -66,17 +66,15 @@ section("setTheme()");
 section("authorize() — policy del modulo Theme");
 {
   const fdo = { u: "mario", r: "fdo" };
-  const staff = { u: "luigi", r: "staff" };
-  const sistemista = { u: "peach", r: "sistemista" };
+  const admin = { u: "peach", r: "admin" };
 
-  check("sistemista può leggere il tema", authorize(sistemista, "temaGet") === true);
-  check("sistemista può impostare il tema", authorize(sistemista, "temaSet") === true);
+  check("admin può leggere il tema", authorize(admin, "temaGet") === true);
+  check("admin può impostare il tema", authorize(admin, "temaSet") === true);
   check("FDO non può leggere il tema", authorize(fdo, "temaGet") === false);
   check("FDO non può impostare il tema", authorize(fdo, "temaSet") === false);
-  check("staff non può impostare il tema", authorize(staff, "temaSet") === false);
 
   check("nessuno non autenticato può agire", authorize(null, "temaGet") === false);
-  check("azione di un altro modulo -> null", authorize(sistemista, "spaces") === null);
+  check("azione di un altro modulo -> null", authorize(admin, "spaces") === null);
 }
 
 // ─── Esito ────────────────────────────────────────────────────────────────────

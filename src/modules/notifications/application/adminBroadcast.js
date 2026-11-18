@@ -2,6 +2,7 @@
 // camera. Usata per comunicazioni occasionali del sistemista, non per i
 // promemoria automatici (quelli restano affari di sendDueReminders/cron).
 
+import { optionalSectionId } from "../../../shared/validation/section.js";
 import { ValidationError, RateLimitedError } from "../../../shared/errors/AppError.js";
 import { parseRoomNumber } from "../../../shared/validation/room.js";
 
@@ -9,7 +10,7 @@ import { parseRoomNumber } from "../../../shared/validation/room.js";
 // lo stesso motivo di `accountRepository`/`hasher` in Identity: rende questo
 // use-case testabile con un limitatore finto, senza toccare Postgres.
 export async function adminBroadcast(
-  { actor, title, body, room },
+  { actor, title, body, room, sectionId = null },
   { notificationsRepository, pushSender, telegramSender, checkRateLimit },
 ) {
   // Limite per account, non per IP: un cookie rubato funziona da qualunque
@@ -39,7 +40,7 @@ export async function adminBroadcast(
   const telegram = { totali: 0, inviati: 0, falliti: 0 };
 
   if (usaPush) {
-    const subs = await notificationsRepository.allPushSubs({ room: parsedRoom });
+    const subs = await notificationsRepository.allPushSubs({ room: parsedRoom, sectionId: optionalSectionId(sectionId) });
     const dispositivi = Array.isArray(subs) ? subs : [];
     push.totali = dispositivi.length;
 
@@ -67,7 +68,7 @@ export async function adminBroadcast(
   }
 
   if (usaTelegram) {
-    const chats = await notificationsRepository.allTelegramSubs({ room: parsedRoom });
+    const chats = await notificationsRepository.allTelegramSubs({ room: parsedRoom, sectionId: optionalSectionId(sectionId) });
     const lista = Array.isArray(chats) ? chats : [];
     telegram.totali = lista.length;
 

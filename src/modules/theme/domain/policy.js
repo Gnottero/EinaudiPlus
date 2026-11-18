@@ -1,22 +1,11 @@
-// Policy di autorizzazione del modulo Theme — stesso principio di
-// identity/domain/roles.js, laundry/domain/policy.js e
-// common-spaces/domain/policy.js.
+// Autorizzazione del modulo: quale permesso serve a ciascuna delle SUE azioni.
+// Chi ha quel permesso lo dice la matrice in identity/domain/permissions.js
+// (niente `return true` di default: un ruolo non elencato non può).
 //
-// Entrambe le azioni sono riservate al sistemista: il tema è una decisione
-// che riguarda l'intera app, non qualcosa che la portineria o lo staff
-// gestiscono giorno per giorno.
+// Il tema stagionale cambia cio' che vede OGNI residente: sistemista.
 
-import { isSysadmin } from "../../identity/index.js";
+import { makeAuthorize, PERMESSI as P } from "../../identity/index.js";
 
-const AZIONI_THEME = new Set(["temaGet", "temaSet"]);
-
-/**
- * Decide se `claims` può eseguire `action`.
- *
- * Torna `null` quando l'azione non appartiene a questo modulo.
- */
-export function authorize(claims, action) {
-  if (!AZIONI_THEME.has(action)) return null;
-  if (!claims) return false;
-  return isSysadmin(claims);
-}
+export const authorize = makeAuthorize({
+  temaGet: P.THEME_MANAGE, temaSet: P.THEME_MANAGE,
+});

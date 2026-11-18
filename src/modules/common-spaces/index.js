@@ -22,8 +22,10 @@ export { SPACES, isValidSpace } from "./domain/spaces.js";
 
 const deps = { commonSpacesRepository };
 
-export async function getBookings(space) {
-  return _getBookings({ space }, deps);
+// `sectionId` = la sezione che POSSIEDE la sala (gia' risolta dal chiamante,
+// tenendo conto delle condivisioni: vedi sections/resourceSection).
+export async function getBookings(space, sectionId) {
+  return _getBookings({ space, sectionId }, deps);
 }
 
 export async function bookSpace(input) {
@@ -34,8 +36,8 @@ export async function clearBooking(input) {
   return _clearBooking(input, deps);
 }
 
-export async function adminGetSpacesOverview() {
-  return _adminGetSpacesOverview({}, deps);
+export async function adminGetSpacesOverview(sectionId = null) {
+  return _adminGetSpacesOverview({ sectionId }, deps);
 }
 
 export async function adminDeleteSpaceBooking(input) {

@@ -5,11 +5,11 @@
 import { rpc } from "../../../shared/db/rpcClient.js";
 
 export const themeRepository = {
-  async get() {
-    return rpc("app_theme_get");
+  async get(sectionId) {
+    return rpc("app_theme_get", { p_section_id: sectionId });
   },
 
-  async set(tema) {
-    return rpc("sysadmin_set_theme", { p_tema: tema });
+  async set(tema, sectionId) {
+    return rpc("sysadmin_set_theme", { p_tema: tema, p_section_id: sectionId });
   },
 };

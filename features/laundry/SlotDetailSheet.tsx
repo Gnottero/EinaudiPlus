@@ -1,4 +1,5 @@
 import { X, Plus } from "lucide-react";
+import { usePairs } from "../../hooks";
 import { WashingMachine } from "../../icons";
 import { TIME_SLOTS, DAYS_DATE, monShort, machinesFor, type WeekData } from "../../modello";
 import { T, type Lang } from "../../i18n";
@@ -9,12 +10,11 @@ import { RED, GREEN, GREEN_T, OOS_T } from "../../tema";
 
 export interface SlotDetailTarget { dayIdx: number; slotIdx: number; }
 
-export function SlotDetailSheet({ target, bookings, lang, roomNumber, isPast, onBook, onModify, onDelete, onClose }: {
+export function SlotDetailSheet({ target, bookings, lang, isPast, onBook, onModify, onDelete, onClose }: {
   target: SlotDetailTarget;
   bookings: WeekData;
   isDark: boolean;
   lang: Lang;
-  roomNumber: string | null;
   // Un turno passato resta apribile per poter cancellare chi lo occupa (vedi
   // WeekOverview), ma le macchine ancora libere in quel turno non diventano
   // prenotabili solo perche' il foglio e' aperto: si potrebbe altrimenti
@@ -26,6 +26,7 @@ export function SlotDetailSheet({ target, bookings, lang, roomNumber, isPast, on
   onClose: () => void;
 }) {
   const t        = T[lang];
+  const pairs    = usePairs();
   const slot     = TIME_SLOTS[target.slotIdx];
   const slotData = bookings[target.dayIdx]?.[target.slotIdx] ?? {};
 
@@ -35,7 +36,7 @@ export function SlotDetailSheet({ target, bookings, lang, roomNumber, isPast, on
   const chip     = "var(--secondary)";
   const divC     = "var(--border)";
 
-  const washIds = machinesFor(roomNumber).washers;
+  const washIds = machinesFor(pairs).washers;
 
   return (
     <div className="absolute inset-0 z-40 flex items-end" style={{ background:"rgba(0,0,0,0.65)" }} onClick={onClose}>

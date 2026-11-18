@@ -115,7 +115,6 @@ export const WeekOverview = memo(function WeekOverview({ lang, week, status, roo
           bookings={week}
           isDark={false}
           lang={lang}
-          roomNumber={sessionRoom}
           isPast={isPastBooking({ day: slotDetail.dayIdx, slot: slotDetail.slotIdx, mid: "" })}
           onBook={(mid)=>{ setTarget({ dayIdx:slotDetail.dayIdx, slotIdx:slotDetail.slotIdx, machineId:mid }); setSlotDetail(null); }}
           onModify={(mid, room)=>{ setModTarget({ dayIdx:slotDetail.dayIdx, slotIdx:slotDetail.slotIdx, machineId:mid, currentRoom:room }); setSlotDetail(null); }}

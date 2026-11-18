@@ -6,31 +6,31 @@
 import { rpc } from "../../../shared/db/rpcClient.js";
 
 export const commonSpacesRepository = {
-  async bookings(space) {
-    return rpc("space_bookings", { p_slug: space });
+  async bookings(space, sectionId) {
+    return rpc("space_bookings", { p_slug: space, p_section_id: sectionId });
   },
 
-  async book({ space, day, start, end, name, type }) {
+  async book({ sectionId, space, day, start, end, name, type }) {
     return rpc("book_space", {
-      p_slug: space, p_day: day, p_start: start, p_end: end, p_name: name, p_type: type,
+      p_slug: space, p_day: day, p_start: start, p_end: end, p_name: name, p_type: type, p_section_id: sectionId,
     });
   },
 
-  async clear({ space, id }) {
-    return rpc("delete_space_booking", { p_slug: space, p_id: id });
+  async clear({ space, id, sectionId }) {
+    return rpc("delete_space_booking", { p_slug: space, p_id: id, p_section_id: sectionId });
   },
 
-  async adminOverview() {
-    return rpc("admin_spaces");
+  async adminOverview(sectionId = null) {
+    return rpc("admin_spaces", { p_section_id: sectionId });
   },
 
   async adminDelete({ id }) {
     return rpc("admin_delete_space_booking", { p_id: id });
   },
 
-  async bookAsDirezione({ space, day, start, end, type }) {
+  async bookAsDirezione({ sectionId, space, day, start, end, type }) {
     return rpc("book_space_as_direzione", {
-      p_slug: space, p_day: day, p_start: start, p_end: end, p_type: type,
+      p_slug: space, p_day: day, p_start: start, p_end: end, p_type: type, p_section_id: sectionId,
     });
   },
 
@@ -42,7 +42,7 @@ export const commonSpacesRepository = {
   },
 
   /** Chiude o riapre una sala (es. per il deposito dei pacchi). */
-  async setChiuso({ space, chiuso }) {
-    return rpc("space_admin_set_chiuso", { p_slug: space, p_chiuso: chiuso });
+  async setChiuso({ space, chiuso, sectionId }) {
+    return rpc("space_admin_set_chiuso", { p_slug: space, p_chiuso: chiuso, p_section_id: sectionId });
   },
 };

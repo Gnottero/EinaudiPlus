@@ -9,6 +9,7 @@
 import { readBody, json, fail, botFilterTokenOk, methodOk } from "./_lib/http.js";
 import { checkRateLimit, clientIp } from "../src/shared/http/rateLimit.js";
 import { getStatoPubblico, iscriviti, dichiaraPagamento, usaTicket } from "../src/modules/grigliata/index.js";
+import { assertRoomAllowed } from "../src/modules/sections/index.js";
 import { wrapHandler } from "../src/shared/errors/wrapHandler.js";
 
 export default wrapHandler("grigliata", async (req, res) => {
@@ -27,12 +28,14 @@ export default wrapHandler("grigliata", async (req, res) => {
       return fail(res, "troppe richieste, riprova fra poco", {}, 429);
     }
     const room = (req.query.room || "").toString().trim();
+    if (room) await assertRoomAllowed(room, "grigliata", { required: false });
     return json(res, 200, await getStatoPubblico(room));
   }
 
   // ── Scrittura ────────────────────────────────────────────────────────────
   const action = String(body.action || "");
   const room = String(body.room ?? "").trim();
+  await assertRoomAllowed(room, "grigliata");
 
   if (!(await checkRateLimit("grigliata", clientIp(req), 30, 600))) {
     return fail(res, "troppe richieste, riprova fra poco", {}, 429);

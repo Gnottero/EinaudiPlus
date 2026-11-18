@@ -18,13 +18,15 @@
 // Spaces, giorno in Conference Room, id ovunque serva...).
 
 import { readBody, json, fail, methodOk } from "../_lib/http.js";
+import { sectionCodeOf } from "../../src/shared/validation/room.js";
 import { logAdminAction } from "../../src/shared/audit/auditLog.js";
 import { wrapHandler } from "../../src/shared/errors/wrapHandler.js";
 
 import {
   currentAdmin, accountByUsername, clearSessionCookie, sessioneAncoraValida,
   authorize as identityAuthorize,
-  listAccounts, createAccount, resetAccountPassword, setAccountActive, setAccountCamera, deleteAccount,
+  listAccounts, createAccount, resetAccountPassword, setAccountActive, setAccountCamera, setAccountSection, deleteAccount,
+  isSuperadmin,
   changeOwnPassword,
 } from "../../src/modules/identity/index.js";
 import {
@@ -39,6 +41,11 @@ import {
   adminAddRecurringRule as adminAddSpaceRecurringRule,
   adminSetSpaceChiuso,
 } from "../../src/modules/common-spaces/index.js";
+import {
+  authorize as sectionsAuthorize, getConfig as getSectionConfig, scopeDecision, filterByScope,
+  adminCreateSection, adminUpdateSection, adminSetRanges, adminCreateLaundry, adminUpdateLaundry,
+  adminSetSharing, adminSetRangeStyle, checkResourceActors, sampleRoomForLaundry, sectionIdOfCode,
+} from "../../src/modules/sections/index.js";
 import { authorize as themeAuthorize, getTheme, setTheme } from "../../src/modules/theme/index.js";
 import {
   authorize as linenChangeAuthorize, getLinenChangeAnchor, setLinenChangeAnchor, setLinenChangeSkip,
@@ -85,7 +92,8 @@ const MUTATIONS = new Set([
   "bookDirezione", "bookSpaceDirezione", "clearDirezione",
   "conferenzaAdd", "conferenzaUpdate", "conferenzaDelete",
   "conferenzaSkip", "conferenzaMove", "conferenzaResetOccorrenza",
-  "accountCreate", "accountSetPassword", "accountSetActive", "accountDelete", "accountSetCamera",
+  "accountCreate", "accountSetPassword", "accountSetActive", "accountDelete", "accountSetCamera", "accountSetSection",
+  "sectionCreate", "sectionUpdate", "sectionSetRanges", "sectionSetSharing", "sectionSetRangeStyle", "laundryCreate", "laundryUpdate",
   "accountChangeOwnPassword", "biciPurge", "biciDeleteRoom", "biciAddRoom", "temaSet",
   "cambioBiancheriaSet", "cambioBiancheriaSkip",
   "grigliataCrea", "grigliataConfermaPagamento", "grigliataAnnullaConfermaPagamento", "grigliataChiudi", "grigliataModifica",
@@ -110,7 +118,8 @@ function authorizeAction(me, action) {
     ?? feedbackAuthorize(me, action)
     ?? conferenceAuthorize(me, action)
     ?? grigliataAuthorize(me, action)
-    ?? opsAuthorize(me, action);
+    ?? opsAuthorize(me, action)
+    ?? sectionsAuthorize(me, action);
 }
 
 export default wrapHandler("admin/data", async (req, res) => {
@@ -137,15 +146,20 @@ export default wrapHandler("admin/data", async (req, res) => {
   const body = readBody(req);
   const action = String(body.action || "");
 
+  // Primo controllo, sul ruolo del cookie: scarta subito il banale. Il
+  // controllo che conta e' quello ripetuto piu' sotto sul ruolo della RIGA.
   if (authorizeAction(me, action) === false) {
     return json(res, 403, { ok: false, error: "permesso negato" });
   }
 
-  // Lo stato dell'account, riletto a ogni azione. Serve a due controlli
-  // diversi, ed e' una lettura sola per entrambi.
+  // Lo stato dell'account, riletto a ogni azione. Serve a tre controlli, ed e'
+  // una lettura sola per tutti: la sessione e' ancora valida, c'e' una password
+  // provvisoria da cambiare, e — nuovo con le sezioni — qual e' il RUOLO e la
+  // SEZIONE attuali dell'account.
   //
-  // `null` distingue "il database non ha risposto" da "l'account non c'e'
-  // piu'": il primo caso lascia passare (vedi sotto), il secondo no.
+  // `rowLetta` distingue "il database non ha risposto" da "l'account non c'e'
+  // piu'": il primo caso lascia passare (ogni azione qui sotto finisce comunque
+  // sul database, e con il database muto fallisce da sola), il secondo no.
   let row;
   let rowLetta = true;
   try {
@@ -154,41 +168,88 @@ export default wrapHandler("admin/data", async (req, res) => {
     rowLetta = false;
   }
 
-  // 1. Sessione revocata: l'account e' stato disattivato o eliminato mentre
-  //    il cookie era ancora in giro.
-  //
-  // Il token e' firmato e dura 12 ore, e currentAdmin() verifica solo firma,
-  // scadenza e ruolo — non puo' sapere che nel frattempo il sistemista ha
-  // premuto "Disattiva". Senza questo controllo quel pulsante non buttava
-  // fuori nessuno fino alla scadenza naturale, cioe' proprio nel caso in cui
-  // serve (account compromesso, persona che se ne va).
-  //
-  // Solo su una risposta VERA del database: se la lettura e' fallita si
-  // prosegue, come prima e per lo stesso motivo — ogni azione qui sotto
-  // finisce comunque sul database, e con il database muto fallisce da sola.
+  // 1. Sessione revocata: l'account e' stato disattivato o eliminato mentre il
+  //    cookie era ancora in giro (il token dura 12 ore e verifica solo firma e
+  //    scadenza).
   if (rowLetta && !sessioneAncoraValida(row)) {
     clearSessionCookie(res);
     return json(res, 401, { ok: false, error: "sessione non piu' valida" });
   }
 
-  // 2. Chi ha ancora la password provvisoria non puo' fare altro che cambiarla.
-  //
-  // Il pannello lo impedisce gia' con una schermata che sostituisce qualunque
-  // scheda, ma quella e' una cortesia verso chi il pannello lo usa: `curl` o
-  // la console del browser parlano a questo endpoint direttamente, e finivano
-  // per lavorare benissimo. Il divieto sembrava esserci e non c'era —
-  // verificato creando un account e facendogli fare un'azione senza cambiare
-  // la password: 200, riuscita.
-  //
-  // Conta perche' la provvisoria e' la password piu' debole del sistema: la
-  // detta un admin a voce o per messaggio, ed era proprio quella a restare
-  // buona a tempo indeterminato per chi non apriva il pannello.
+  // 2. Chi ha ancora la password provvisoria non puo' fare altro che cambiarla:
+  //    il pannello lo impedisce con una schermata, ma `curl` parla a questo
+  //    endpoint direttamente.
   if (action !== "accountChangeOwnPassword" && Boolean(row?.deve_cambiare_password)) {
     return json(res, 403, {
       ok: false,
       error: "cambia la password provvisoria prima di continuare",
       deve_cambiare_password: true,
     });
+  }
+
+  // 3. Ruolo e sezione dalla RIGA, non dal cookie: promuovere, degradare o
+  //    spostare un account ha effetto subito, non alla scadenza del token.
+  const ruolo = row?.ruolo ?? me.r;
+  const claims = { ...me, r: ruolo };
+  if (authorizeAction(claims, action) === false) {
+    return json(res, 403, { ok: false, error: "permesso negato" });
+  }
+  const superadmin = isSuperadmin(claims);
+
+  // ── Ambito per sezione ────────────────────────────────────────────────
+  // Il ruolo (cosa puo' fare) e' deciso; qui si decide su QUALE sezione, e
+  // si ricavano la sezione che agisce (A), quella che possiede la risorsa
+  // (R, condivisioni incluse) e i controlli "per id" da eseguire.
+  const who = { role: ruolo, sectionId: row?.section_id ?? null };
+  const config = await getSectionConfig();
+  const plan = scopeDecision(who, action, body, config);
+  if (!plan.allowed) {
+    return json(res, plan.status ?? 403, { ok: false, error: plan.status === 400 ? plan.reason : `permesso negato: ${plan.reason}` });
+  }
+  const A = plan.actingSectionId;          // null = superadmin senza sezione scelta
+  const R = plan.resourceSectionId ?? null;
+  for (const c of plan.checks) {
+    await checkResourceActors({ kind: c.kinds, id: c.id, actingSectionId: A });
+  }
+
+  // ── Regole sugli account ──────────────────────────────────────────────
+  // Un admin gestisce SOLO gli account fdo e delegato della propria sezione:
+  // mai un altro admin, mai un superadmin (altrimenti reimposterebbe la
+  // password di chi sta sopra e lo diventerebbe). Il superadmin gestisce tutti.
+  const TOCCA_ACCOUNT = new Set(["accountSetPassword", "accountSetActive", "accountDelete", "accountSetCamera", "accountSetSection"]);
+  const RUOLI_GESTIBILI_DA_ADMIN = new Set(["fdo", "delegato"]);
+  if (action === "accountSetSection" && !superadmin) {
+    return json(res, 403, { ok: false, error: "permesso negato: solo un superadmin sposta un account di sezione" });
+  }
+  if (action === "accountCreate" && !superadmin) {
+    if (!RUOLI_GESTIBILI_DA_ADMIN.has(String(body.ruolo || ""))) {
+      return json(res, 403, { ok: false, error: "permesso negato: un admin crea solo account fdo e delegato" });
+    }
+  }
+  let targetAccount = null;
+  if (TOCCA_ACCOUNT.has(action)) {
+    const elenco = await listAccounts();
+    targetAccount = (elenco?.items ?? []).find((a) => a.id === Number(body.id)) ?? null;
+    if (!targetAccount) return json(res, 400, { ok: false, error: "account non trovato" });
+    if (!superadmin && (targetAccount.section_id !== A || !RUOLI_GESTIBILI_DA_ADMIN.has(targetAccount.ruolo))) {
+      return json(res, 403, { ok: false, error: "permesso negato: account fuori dalla tua sezione o di un ruolo superiore" });
+    }
+  }
+  // La camera associata a un account deve stare nella sezione dell'account.
+  if (action === "accountSetCamera" && String(body.camera ?? "").trim() !== "") {
+    const sidCamera = sectionIdOfCode(config, sectionCodeOf(body.camera));
+    if (sidCamera === null || sidCamera !== targetAccount.section_id) {
+      return json(res, 400, { ok: false, error: "la camera deve essere della sezione dell'account" });
+    }
+  }
+  // Attivare o disattivare una sezione intera e' del superadmin.
+  if (action === "sectionUpdate" && body.active !== undefined && !superadmin) {
+    return json(res, 403, { ok: false, error: "permesso negato: solo un superadmin attiva o disattiva una sezione" });
+  }
+  // Un broadcast "a una camera" non puo' uscire dalla sezione dell'admin.
+  if (action === "broadcastPush" && A !== null && String(body.room ?? "").trim() !== "" &&
+      sectionIdOfCode(config, sectionCodeOf(body.room)) !== A) {
+    return json(res, 403, { ok: false, error: "permesso negato: camera di un'altra sezione" });
   }
 
   let result;
@@ -204,15 +265,20 @@ export default wrapHandler("admin/data", async (req, res) => {
       break;
 
     case "feedback":
-      result = await adminListFeedback({ onlyOpen: body.only_open, limit: body.limit });
+      result = await adminListFeedback({ onlyOpen: body.only_open, limit: body.limit, sectionIds: plan.scopeIds });
       break;
 
-    case "spaces":
-      result = await adminGetSpacesOverview();
+    // La panoramica delle sale: cinema e musica possono avere proprietari
+    // diversi (si condividono separatamente), quindi si uniscono.
+    case "spaces": {
+      const ids = plan.spaceSectionIds ?? [null];
+      const parti = await Promise.all(ids.map((id) => adminGetSpacesOverview(id)));
+      result = { ok: true, items: parti.flatMap((p) => p?.items ?? []) };
       break;
+    }
 
     case "spaceSetChiuso":
-      result = await adminSetSpaceChiuso({ space: body.space, chiuso: body.chiuso });
+      result = await adminSetSpaceChiuso({ space: body.space, chiuso: body.chiuso, sectionId: R });
       break;
 
     // ── Scritture ────────────────────────────────────────────────────────
@@ -223,7 +289,7 @@ export default wrapHandler("admin/data", async (req, res) => {
       break;
 
     case "deleteBooking":
-      result = await adminDeleteBooking({ id: body.id });
+      result = await adminDeleteBooking({ id: body.id, sectionIds: plan.scopeIds });
       break;
 
     case "forceBook":
@@ -234,7 +300,7 @@ export default wrapHandler("admin/data", async (req, res) => {
       break;
 
     case "markFeedback":
-      result = await adminMarkFeedback({ id: body.id, handled: body.handled });
+      result = await adminMarkFeedback({ id: body.id, handled: body.handled, sectionIds: plan.scopeIds });
       break;
 
     case "deleteSpaceBooking":
@@ -248,28 +314,34 @@ export default wrapHandler("admin/data", async (req, res) => {
 
     case "bookSpaceDirezione":
       result = await adminBookSpaceAsDirezione({
-        space: body.space, day: body.day, start: body.start, end: body.end, type: body.type,
+        space: body.space, day: body.day, start: body.start, end: body.end, type: body.type, sectionId: R,
       });
       break;
 
     // Liberare un turno, compresi quelli della DIREZIONE che dal percorso
     // pubblico sono protetti. `p_as_admin: true` si può scrivere qui e solo
     // qui: currentAdmin() ha già verificato il cookie in cima all'handler.
-    case "clearDirezione":
-      result = await adminClearAsDirezione({ room: body.room, day: body.day, slot: body.slot, machine: body.machine });
+    //
+    // Se chi agisce e' la Direzione (room = "DIREZIONE") la SQL non saprebbe
+    // di quale lavanderia si parla (ricadrebbe sul Valentino): il client manda
+    // `laundry_id`, e qui si passa una camera qualsiasi di quella lavanderia.
+    case "clearDirezione": {
+      const room = String(body.room ?? "") === "DIREZIONE"
+        ? sampleRoomForLaundry(config, plan.laundryId, A)
+        : body.room;
+      result = await adminClearAsDirezione({ room, day: body.day, slot: body.slot, machine: body.machine });
       break;
+    }
 
-    // ── Sala conferenze ─────────────────────────────────────────────────
-    // La programmano solo gli amministratori: i residenti la leggono da
-    // /api/conferenze, che di scrivere non sa proprio.
+    // ── Sala polivalente (della sezione, o di quella che la condivide) ───
     case "conferenzaList":
-      result = await conferenceListRules();
+      result = await conferenceListRules(R);
       break;
 
     case "conferenzaAdd":
       result = await conferenceAddRule({
         titolo: body.titolo, inizio: body.inizio, fine: body.fine, dal: body.dal, al: body.al,
-        giorno: body.giorno, note: body.note, attore: me.u,
+        giorno: body.giorno, note: body.note, attore: me.u, sectionId: R,
       });
       break;
 
@@ -283,8 +355,7 @@ export default wrapHandler("admin/data", async (req, res) => {
     // ── Un singolo incontro di una serie ricorrente ──────────────────────
     // `data` è la data che la REGOLA produce (RECURRENCE-ID), non quella a
     // cui l'incontro si vede: è il suo nome per sempre, anche dopo che è
-    // stato spostato. Mandare quella visibile creerebbe una seconda
-    // eccezione invece di correggere la prima.
+    // stato spostato.
     case "conferenzaSkip":
       result = await conferenceSkipOccurrence({ id: body.id, data: body.data, attore: me.u });
       break;
@@ -304,11 +375,7 @@ export default wrapHandler("admin/data", async (req, res) => {
       result = await conferenceDeleteRule(body.id);
       break;
 
-    // ── Sistemista: account amministrativi ───────────────────────────────
-    // Prima c'erano solo le tre variabili d'ambiente su Vercel; ora il
-    // sistemista crea, disattiva e reimposta gli account da qui. Le
-    // password non toccano mai il database in chiaro: si cifrano subito,
-    // esattamente come per gli account storici.
+    // ── Account ──────────────────────────────────────────────────────────
     case "accountList":
       result = await listAccounts();
       break;
@@ -316,7 +383,11 @@ export default wrapHandler("admin/data", async (req, res) => {
     case "accountCreate": {
       const password = String(body.password || "");
       if (password.length < 8) return fail(res, "la password deve avere almeno 8 caratteri");
-      result = await createAccount(String(body.username || "").trim(), password, String(body.ruolo || ""), me.u);
+      const ruoloNuovo = String(body.ruolo || "");
+      // Un admin crea sempre nella propria sezione; il superadmin sceglie
+      // (section_id) — tranne per un altro superadmin, che non ne ha.
+      const sezione = ruoloNuovo === "superadmin" ? null : (A ?? body.section_id ?? null);
+      result = await createAccount(String(body.username || "").trim(), password, ruoloNuovo, me.u, sezione);
       break;
     }
 
@@ -335,37 +406,29 @@ export default wrapHandler("admin/data", async (req, res) => {
       result = await setAccountCamera(Number(body.id), body.camera);
       break;
 
+    case "accountSetSection":
+      result = await setAccountSection(Number(body.id), body.section_id);
+      break;
+
     case "accountDelete":
       result = await deleteAccount(Number(body.id));
       break;
 
-    // Cambio password fatto dal titolare per se' stesso: nessuna sessione
-    // sistemista richiesta, ma serve la password attuale (quella data
-    // dall'admin alla creazione o al reset) per dimostrare di essere lui.
-    //
-    // E' l'unica azione ammessa a chi ha ancora la password provvisoria:
-    // la guardia in testa all'handler lascia passare solo questa.
+    // Il titolare cambia la propria password: nessun ruolo richiesto oltre
+    // all'essere autenticato.
     case "accountChangeOwnPassword": {
       const attuale = String(body.password_attuale || "");
       const nuova = String(body.password_nuova || "");
-      // Le tre validazioni (password corta, account non trovato, password
-      // attuale sbagliata) vivono dentro changeOwnPassword() e arrivano qui
-      // come AppError — wrapHandler le traduce nella stessa forma
-      // { ok:false, error } di sempre.
       result = await changeOwnPassword(me.u, attuale, nuova);
       break;
     }
 
-    // ── Sistemista: regole ricorrenti ────────────────────────────────────
+    // ── Ricorrenti, pulizia, conteggi: della sezione (superadmin: tutte) ──
     case "recurringList":
-      result = await listRecurringRules();
+      result = await listRecurringRules(A);
       break;
 
     case "recurringAddLaundry":
-      // Non si applica subito: resta inerte fino alla notte fra domenica e
-      // lunedì, quando il cron la materializza per la settimana che sta per
-      // iniziare. Vale anche per il resto della settimana in corso: niente
-      // occupazioni a sorpresa a metà settimana.
       result = await adminAddRecurringRule({
         laundryId: body.laundry_id, day: body.day, slot: body.slot,
         machine: body.machine, room: body.room, note: body.note,
@@ -384,33 +447,24 @@ export default wrapHandler("admin/data", async (req, res) => {
       break;
 
     case "recurringDelete":
-      // Toglie la regola, non le prenotazioni già create da essa: quelle
-      // restano finché la settimana non finisce, e si cancellano a mano.
       result = await deleteRecurringRule(body.id);
       break;
 
     case "applyRecurring":
-      result = await applyRecurringRules(body.offset);
+      result = await applyRecurringRules(body.offset, A);
       break;
 
-    // ── Sistemista: pulizia ──────────────────────────────────────────────
     case "purge":
-      // `sala` assente = tutte, cioe' il comportamento storico. Il controllo
-      // su quali sale esistono sta nella funzione SQL, non qui.
-      result = await purgeData({ scope: body.scope, sala: body.sala });
+      result = await purgeData({ scope: body.scope, sala: body.sala, sectionId: A });
       break;
 
-    // Conteggio delle prenotazioni vive, per sala. Il pannello lo rilegge da
-    // solo: e' quello che va a zero quando la pulizia ha funzionato davvero.
     case "counts":
-      result = await getCounts();
+      result = await getCounts(A);
       break;
 
-    // Quali camere hanno le notifiche attive, canale per canale: push (web
-    // app) e Telegram sono liste separate, ciascuna con l'id di ogni riga
-    // per poterla cancellare singolarmente.
+    // ── Notifiche ────────────────────────────────────────────────────────
     case "pushSubs":
-      result = await adminListPushSubs();
+      result = await adminListPushSubs(A);
       break;
 
     case "deletePushSub":
@@ -418,53 +472,50 @@ export default wrapHandler("admin/data", async (req, res) => {
       break;
 
     case "telegramSubs":
-      result = await adminListTelegramSubs();
+      result = await adminListTelegramSubs(A);
       break;
 
     case "deleteTelegramSub":
       result = await adminDeleteTelegramSub(body.id);
       break;
 
-    // Notifica manuale ai dispositivi push iscritti — a tutti, o a una sola
-    // camera se `body.room` e' valorizzato: usata per comunicazioni del
-    // sistemista, non per i promemoria automatici (affari del cron).
     case "broadcastPush":
-      result = await adminBroadcast({ actor: me.u, title: body.title, body: body.body, room: body.room });
+      result = await adminBroadcast({ actor: me.u, title: body.title, body: body.body, room: body.room, sectionId: A });
       break;
 
-    // ── Tema stagionale ──────────────────────────────────────────────────
+    // ── Tema e cambio biancheria (della sezione, o di quella che li condivide)
     case "temaGet":
-      result = await getTheme();
+      result = await getTheme(R);
       break;
 
     case "temaSet":
-      result = await setTheme(body.tema);
+      result = await setTheme(body.tema, R);
       break;
 
-    // ── Cambio biancheria del martedì ────────────────────────────────────
     case "cambioBiancheriaGet":
-      result = await getLinenChangeAnchor();
+      result = await getLinenChangeAnchor(R);
       break;
 
     case "cambioBiancheriaSet":
-      result = await setLinenChangeAnchor(body.ancora_data, body.ancora_tipo);
+      result = await setLinenChangeAnchor(body.ancora_data, body.ancora_tipo, R);
       break;
 
     case "cambioBiancheriaSkip":
-      result = await setLinenChangeSkip(body.data, body.salta);
+      result = await setLinenChangeSkip(body.data, body.salta, R);
       break;
 
-    // ── Grigliata (delegato e sistemista) ────────────────────────────────
+    // ── Grigliata (della sezione, o di quella che la condivide) ──────────
     case "grigliataCrea":
       result = await adminCreaEvento({
         titolo: body.titolo, scadenza: body.scadenza, giornoEvento: body.giorno_evento,
         paypalLink: body.paypal_link, satispayLink: body.satispay_link,
         menu: body.menu, pagamentiAttivi: body.pagamenti_attivi, quota: body.quota, attore: me.u,
+        sectionId: R,
       });
       break;
 
     case "grigliataOverview":
-      result = await grigliataAdminOverview();
+      result = await grigliataAdminOverview(R);
       break;
 
     case "grigliataConfermaPagamento":
@@ -511,16 +562,15 @@ export default wrapHandler("admin/data", async (req, res) => {
       result = await adminImpostaQuota(body.evento_id, body.quota);
       break;
 
-    // ── Bici ──────────────────────────────────────────────────────────────
-    // Lettura: FDO e sistemista. Cancellazione totale (reset annuale) e
-    // assegnazione/rimozione per camera: solo sistemista — vedi
-    // src/modules/bikes/domain/policy.js.
+    // ── Bici (per camere: la sezione e' quella della camera) ─────────────
     case "biciList":
       result = await adminListBikes();
       break;
 
+    // Il reset annuale: di una sezione per un admin, di tutte per il superadmin
+    // senza sezione scelta.
     case "biciPurge":
-      result = await adminPurgeBikes();
+      result = await adminPurgeBikes(A === null ? null : (config.sections ?? []).find((s) => s.id === A)?.code ?? null);
       break;
 
     case "biciDeleteRoom":
@@ -531,15 +581,49 @@ export default wrapHandler("admin/data", async (req, res) => {
       result = await adminAddBikeRoom(body.room);
       break;
 
+    // ── Sezioni e lavanderie ──────────────────────────────────────────────
+    case "sectionList":
+      result = await getSectionConfig({ fresh: true });
+      break;
+
+    case "sectionCreate":
+      result = await adminCreateSection({
+        code: body.code, number: body.number, name: body.name, features: body.features, ranges: body.ranges,
+      });
+      break;
+
+    case "sectionUpdate":
+      result = await adminUpdateSection({ id: body.id, name: body.name, features: body.features, active: body.active });
+      break;
+
+    case "sectionSetSharing":
+      result = await adminSetSharing({ id: body.id, shared: body.shared });
+      break;
+
+    case "sectionSetRangeStyle":
+      result = await adminSetRangeStyle({ rangeId: body.range_id, label: body.label, color: body.color });
+      break;
+
+    case "sectionSetRanges":
+      result = await adminSetRanges({ id: body.id, ranges: body.ranges });
+      break;
+
+    case "laundryCreate":
+      result = await adminCreateLaundry({ slug: body.slug, name: body.name, pairs: body.pairs });
+      break;
+
+    case "laundryUpdate":
+      result = await adminUpdateLaundry({ id: body.id, name: body.name, pairs: body.pairs });
+      break;
+
     default:
       return fail(res, "azione sconosciuta");
   }
 
-  // Solo qui siamo certi che l'azione sia davvero avvenuta (nessun "return
-  // fail" prima l'ha intercettata): logga solo i tentativi riusciti. Non si
-  // aspetta pero' che il log finisca prima di rispondere — resta best-effort,
-  // come sempre: se si perde un tentativo non e' diverso da un log che
-  // fallisce per un errore di rete, gia' ignorato qui sotto.
+  // Le azioni "wide" tornano dati di tutte le sezioni: si tolgono quelli fuori
+  // dalla sezione di chi chiede (no-op per il superadmin senza sezione scelta).
+  result = filterByScope(action, result, plan.scopeIds, await getSectionConfig());
+
   if (MUTATIONS.has(action)) {
     logAdminAction({
       actor: me.u, action,

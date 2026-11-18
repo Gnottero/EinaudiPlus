@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { usePairs } from "../../hooks";
 import { X, Loader2, AlertTriangle, Plus } from "lucide-react";
 import { WashingMachine } from "../../icons";
 import { TIME_SLOTS, machinesFor, bookingAt, type WeekData, type StatusData } from "../../modello";
@@ -17,12 +18,13 @@ export function QuickBookModal({ lang, day, slot, week, status, roomNumber, isAd
   const puoDirezione = isAdmin && !!roomNumber && roomNumber !== api.DIREZIONE;
   const [perDirezione, setPerDirezione] = useState(false);
   const t = T[lang];
+  const pairs = usePairs();
   const fg="var(--foreground)", sub="var(--gray-accessible-text)", div="var(--border)", surf="var(--card)";
   const [busy, setBusy] = useState<string | null>(null);
   const [err, setErr]   = useState<string | null>(null);
   const sl = TIME_SLOTS[slot];
 
-  const washers = machinesFor(roomNumber).washers.map((wid) => {
+  const washers = machinesFor(pairs).washers.map((wid) => {
     const L = wid[2];
     const oos = status[wid] === "oos";
     const room = bookingAt(week, day, slot, wid);

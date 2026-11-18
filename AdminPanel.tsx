@@ -16,7 +16,8 @@
 // e le poche cose che App.tsx e Conferenze.tsx importano ancora da qui.
 
 import { useCallback, useEffect, useState } from "react";
-import { call } from "./features/admin-shared/adminApi";
+import { call, getAdminSection, setAdminSection } from "./features/admin-shared/adminApi";
+import { invalidateSectionConfig, loadSectionConfig } from "./sectionsApi";
 import { S } from "./features/admin-shared/adminStyles";
 import type { Laundry } from "./features/laundry/admin/types";
 import { Login } from "./features/identity/admin/Login";
@@ -30,6 +31,7 @@ import { Notifiche } from "./features/notifications/admin/NotificheTab";
 import { Manutenzione } from "./features/ops/admin/Manutenzione";
 import { Tema } from "./features/theme/admin/Tema";
 import { GrigliataAdmin } from "./features/grigliata/admin/GrigliataAdmin";
+import { SezioniTab } from "./features/sections/admin/SezioniTab";
 import { CambiaPasswordObbligata } from "./features/identity/admin/Session";
 
 export type { Role, Tab } from "./features/admin-shared/types";
@@ -46,8 +48,17 @@ export { GiornoSheetAdmin } from "./features/conference-room/admin/GiornoSheetAd
 // qualche voce in piu' nella lista di sinistra.
 //
 // La barra del ruolo con "Esci" sta qui dentro, su ogni sezione: chi deve
-// passare da FDO a sistemista lo fa da dove sta gia' lavorando, senza andare a
+// passare da FDO ad admin lo fa da dove sta gia' lavorando, senza andare a
 // cercare il menu.
+
+// Le schede che agiscono su UNA sezione: un superadmin (che non ne ha una sua)
+// le apre solo dopo aver scelto la sezione dal selettore in cima.
+const SCHEDE_DI_SEZIONE: Tab[] = [
+  "macchine", "cambiobiancheria", "segnalazioni", "bici", "grigliataAdmin",
+  "ricorrenti", "notifiche", "manutenzione", "tema",
+];
+
+type SezioneBreve = { id: number; code: string; name: string };
 
 export function AdminScreens({ tab, onSession }: {
   tab: Tab;
@@ -58,6 +69,9 @@ export function AdminScreens({ tab, onSession }: {
   const [username, setUsername] = useState<string | null>(null);
   const [deveCambiare, setDeveCambiare] = useState(false);
   const [laundries, setLaundries] = useState<Laundry[]>([]);
+  // Selettore di sezione del superadmin (gli altri ruoli hanno la loro).
+  const [sezioni, setSezioni] = useState<SezioneBreve[]>([]);
+  const [sezioneSel, setSezioneSel] = useState<number | null>(getAdminSection());
 
   const loadOverview = useCallback(async () => {
     try { setLaundries((await call("overview")).laundries); }
@@ -78,23 +92,56 @@ export function AdminScreens({ tab, onSession }: {
   }, [onSession]);
 
   useEffect(() => { refreshSession(); }, [refreshSession]);
-  // Lo staff non vede Macchine ne' Segnalazioni, il delegato non vede
-  // nient'altro che Grigliata — le uniche schede che usano `laundries` —
-  // quindi per entrambi questa chiamata fallirebbe soltanto (il server la
-  // rifiuta: VIETATE_A_STAFF in laundry/domain/policy.js per lo staff,
-  // isDelegato() in ops/domain/policy.js per il delegato) senza nessun
-  // beneficio.
+
+  // Le schede leggono i gruppi di camere (colori) dalla configurazione.
+  useEffect(() => { if (logged) loadSectionConfig(); }, [logged]);
+
+  const superadmin = role === "superadmin";
+
+  // L'elenco delle sezioni per il selettore: "tutte" (nessun section_id) cosi'
+  // il superadmin le vede tutte.
   useEffect(() => {
-    if (logged && role !== "staff" && role !== "delegato") loadOverview();
-  }, [logged, role, loadOverview]);
+    if (!logged || !superadmin) return;
+    call("sectionList", { section_id: undefined })
+      .then((d) => {
+        const lista: SezioneBreve[] = (d.sections ?? []).map((x: any) => ({ id: x.id, code: x.code, name: x.name }));
+        setSezioni(lista);
+        // Una sezione scelta non e' mai "nessuna": se quella salvata non esiste piu', la prima.
+        setSezioneSel((cur) => {
+          const valida = cur !== null && lista.some((x) => x.id === cur) ? cur : (lista[0]?.id ?? null);
+          setAdminSection(valida);
+          return valida;
+        });
+      })
+      .catch(() => setSezioni([]));
+  }, [logged, superadmin]);
+
+  function scegliSezione(id: number | null) {
+    setAdminSection(id);
+    setSezioneSel(id);
+    invalidateSectionConfig();
+    loadSectionConfig();
+  }
+
+  // Il delegato non vede nient'altro che Grigliata — l'unica scheda che non usa
+  // `laundries` — quindi per lui la chiamata fallirebbe soltanto (il server la
+  // rifiuta: il delegato ha un solo permesso, la grigliata). Per il
+  // superadmin si rifa' a ogni cambio di sezione.
+  useEffect(() => {
+    if (logged && role !== "delegato" && (!superadmin || sezioneSel !== null)) loadOverview();
+  }, [logged, role, superadmin, sezioneSel, loadOverview]);
 
   // L'uscita non sta piu' qui: la fa il pulsante della camera nell'app, che
   // chiude la sessione e riporta al selettore della stanza. `adminLogout()`
   // resta esportato ed e' quello che App.tsx chiama.
 
-  const sistemista = role === "sistemista";
-  const staff = role === "staff";
+  // `admin` ha tutti i permessi di una sezione; `superadmin` gli stessi su
+  // tutte le sezioni (e in piu' crea sezioni e lavanderie). Per le schede
+  // sono la stessa cosa. E' solo cosa mostrare: il permesso vero lo decide il
+  // server (identity/domain/permissions.js).
+  const admin = role === "admin" || superadmin;
   const delegato = role === "delegato";
+  const portineria = role === "fdo" || admin;   // chi vede macchine, segnalazioni, bici, biancheria
 
   if (logged === null) {
     return <p style={{ fontSize: 13, ...S.sub, padding: "20px 4px" }}>Caricamento…</p>;
@@ -126,49 +173,65 @@ export function AdminScreens({ tab, onSession }: {
     );
   }
 
+  const senzaSezione = superadmin && sezioneSel === null && SCHEDE_DI_SEZIONE.includes(tab);
+  const riservata = (chi: string) => <p style={{ fontSize: 13, ...S.sub }}>Sezione riservata a {chi}.</p>;
+
   return (
     <div style={{ paddingBottom: 40, color: "var(--foreground)" }}>
-      {/* Qui c'era una barra col ruolo e il pulsante Esci. Tolta: l'uscita
-          avviene toccando il pulsante della camera ("DIREZIONE") in alto, che
-          chiude la sessione e riporta alla scelta della stanza. Un secondo
-          punto d'uscita, ripetuto su ogni sezione, faceva solo rumore sopra il
-          contenuto — e il ruolo si capisce gia' da quali voci si vedono in
-          navigazione (Ricorrenti e Manutenzione solo da sistemista). */}
+      {/* Il superadmin non ha una sezione sua: sceglie qui su quale lavora, e
+          la scelta viaggia con ogni chiamata (adminApi.ts). Gli altri ruoli non
+          vedono il selettore: hanno UNA sezione, decisa dal loro account. */}
+      {superadmin && tab !== "sezioni" && tab !== "account" && (
+        <div style={{ ...S.card, padding: 12, marginBottom: 16, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          <label style={{ fontSize: 12, fontWeight: 700, ...S.sub }}>Sezione</label>
+          <select style={{ ...S.input, width: "auto", minWidth: 160 }} value={sezioneSel ?? ""}
+                  onChange={(e) => scegliSezione(e.target.value === "" ? null : Number(e.target.value))}>
+            <option value="">Scegli una sezione…</option>
+            {sezioni.map((x) => <option key={x.id} value={x.id}>{x.code} · {x.name}</option>)}
+          </select>
+        </div>
+      )}
 
-      {/* Le sezioni riservate al sistemista (o escluse per lo staff) non
-          compaiono nemmeno nella navigazione, ma se ci si arriva lo stesso
-          il controllo vero resta sul server: nascondere una voce non e'
-          un'autorizzazione. */}
-      {tab === "macchine" && (!staff && !delegato
+      {senzaSezione ? (
+        <p style={{ fontSize: 13, ...S.sub }}>Scegli una sezione per continuare.</p>
+      ) : (<>
+      {/* Le schede non permesse al ruolo non compaiono nemmeno nella
+          navigazione, ma se ci si arriva lo stesso il controllo vero resta sul
+          server: nascondere una voce non e' un'autorizzazione. */}
+      {tab === "macchine" && (portineria
         ? <Macchine laundries={laundries} reload={loadOverview} />
-        : <p style={{ fontSize: 13, ...S.sub }}>Sezione riservata a FDO e sistemista.</p>)}
-      {tab === "cambiobiancheria" && (!staff && !delegato
+        : riservata("FDO e admin"))}
+      {tab === "cambiobiancheria" && (portineria
         ? <CambioBiancheria />
-        : <p style={{ fontSize: 13, ...S.sub }}>Sezione riservata a FDO e sistemista.</p>)}
-      {tab === "segnalazioni" && (!staff && !delegato
+        : riservata("FDO e admin"))}
+      {tab === "segnalazioni" && (portineria
         ? <Segnalazioni laundries={laundries} reload={loadOverview} />
-        : <p style={{ fontSize: 13, ...S.sub }}>Sezione riservata a FDO e sistemista.</p>)}
-      {tab === "bici" && (!staff && !delegato
-        ? <Bici sistemista={sistemista} />
-        : <p style={{ fontSize: 13, ...S.sub }}>Sezione riservata a FDO e sistemista.</p>)}
-      {tab === "grigliataAdmin" && (delegato || sistemista
+        : riservata("FDO e admin"))}
+      {tab === "bici" && (portineria
+        ? <Bici sistemista={admin} />
+        : riservata("FDO e admin"))}
+      {tab === "grigliataAdmin" && (delegato || admin
         ? <GrigliataAdmin />
-        : <p style={{ fontSize: 13, ...S.sub }}>Sezione riservata al delegato e al sistemista.</p>)}
-      {tab === "account" && (sistemista
-        ? <Accounts me={username} />
-        : <p style={{ fontSize: 13, ...S.sub }}>Sezione riservata al sistemista.</p>)}
-      {tab === "ricorrenti" && (sistemista
+        : riservata("delegato e admin"))}
+      {tab === "account" && (admin
+        ? <Accounts me={username} myRole={role} />
+        : riservata("admin"))}
+      {tab === "ricorrenti" && (admin
         ? laundries.length > 0 && <Ricorrenti laundries={laundries} />
-        : <p style={{ fontSize: 13, ...S.sub }}>Sezione riservata al sistemista.</p>)}
-      {tab === "notifiche" && (sistemista
+        : riservata("admin"))}
+      {tab === "notifiche" && (admin
         ? <Notifiche />
-        : <p style={{ fontSize: 13, ...S.sub }}>Sezione riservata al sistemista.</p>)}
-      {tab === "manutenzione" && (sistemista
+        : riservata("admin"))}
+      {tab === "manutenzione" && (admin
         ? <Manutenzione />
-        : <p style={{ fontSize: 13, ...S.sub }}>Sezione riservata al sistemista.</p>)}
-      {tab === "tema" && (sistemista
+        : riservata("admin"))}
+      {tab === "sezioni" && (admin
+        ? <SezioniTab role={role} />
+        : riservata("admin"))}
+      {tab === "tema" && (admin
         ? <Tema />
-        : <p style={{ fontSize: 13, ...S.sub }}>Sezione riservata al sistemista.</p>)}
+        : riservata("admin"))}
+      </>)}
     </div>
   );
 }

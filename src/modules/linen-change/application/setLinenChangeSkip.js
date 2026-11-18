@@ -3,15 +3,16 @@
 // un salto non consuma un turno dell'alternanza, il martedì dopo torna al
 // tipo che avrebbe avuto comunque.
 
+import { requireSectionId } from "../../../shared/validation/section.js";
 import { ValidationError, fromRpcError } from "../../../shared/errors/AppError.js";
 import { isTuesdayISO } from "../domain/schedule.js";
 
-export async function setLinenChangeSkip({ data, salta }, { linenChangeRepository }) {
+export async function setLinenChangeSkip({ data, salta, sectionId }, { linenChangeRepository }) {
   const dataValue = String(data || "");
   if (!isTuesdayISO(dataValue)) throw new ValidationError("la data deve essere un martedì");
 
   try {
-    return await linenChangeRepository.setSkip({ data: dataValue, salta: Boolean(salta) });
+    return await linenChangeRepository.setSkip({ data: dataValue, salta: Boolean(salta), sectionId: requireSectionId(sectionId) });
   } catch (err) {
     // Vedi la stessa nota in getLinenChangeAnchor.js. È anche il caso più
     // probabile in pratica finché migrations/036 non è applicata: la RPC

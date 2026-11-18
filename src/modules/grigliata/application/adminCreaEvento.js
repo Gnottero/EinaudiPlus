@@ -11,11 +11,12 @@
 // lasciare spenti (grigliata offerta, contanti sul posto) — solo allora i
 // link non sono obbligatori. Assente = attivi, il comportamento di sempre.
 
+import { requireSectionId } from "../../../shared/validation/section.js";
 import { ValidationError, fromRpcError } from "../../../shared/errors/AppError.js";
 import { isValidDate, controllaMenu, controllaQuota } from "../domain/validazione.js";
 
 export async function adminCreaEvento(
-  { titolo, scadenza, giornoEvento, paypalLink, satispayLink, menu, pagamentiAttivi, quota, attore },
+  { titolo, scadenza, giornoEvento, paypalLink, satispayLink, menu, pagamentiAttivi, quota, attore, sectionId },
   { grigliataRepository },
 ) {
   // Può essere anche già passata: iscrizioni chiuse alla partenza, scheda
@@ -56,7 +57,7 @@ export async function adminCreaEvento(
       menu: esito.menu.map(({ nome, ticket }) => ({ nome, ticket: ticket.map(({ nome, emoji }) => ({ nome, emoji })) })),
       pagamentiAttivi: pagamenti,
       quota: esitoQuota.quota,
-      attore,
+      attore, sectionId: requireSectionId(sectionId),
     });
   } catch (err) {
     // Vedi la stessa nota in linen-change/application/*.js: fromRpcError()

@@ -4,7 +4,7 @@
 // Dominio coperto: l'ancora (data + tipo) da cui si calcola, per alternanza
 // settimanale, se un dato martedì è cambio biancheria grande o piccolo, più
 // i martedì saltati (nessun cambio, senza disturbare l'alternanza). Tutte e
-// tre azioni del pannello admin (FDO e sistemista, non lo staff — vedi
+// tre azioni del pannello admin (FDO e admin — vedi
 // domain/policy.js).
 //
 // La lettura lato residenti non passa da qui: è già inclusa nella risposta
@@ -29,16 +29,16 @@ export { TIPI, isValidTipo } from "./domain/schedule.js";
 // Notifications: Linen Change non sa nulla di push/Telegram.
 const deps = { linenChangeRepository, notifyRoom: notifyRoomChannel };
 
-export async function getLinenChangeAnchor() {
-  return _getLinenChangeAnchor({}, deps);
+export async function getLinenChangeAnchor(sectionId) {
+  return _getLinenChangeAnchor({ sectionId }, deps);
 }
 
-export async function setLinenChangeAnchor(data, tipo) {
-  return _setLinenChangeAnchor({ data, tipo }, deps);
+export async function setLinenChangeAnchor(data, tipo, sectionId) {
+  return _setLinenChangeAnchor({ data, tipo, sectionId }, deps);
 }
 
-export async function setLinenChangeSkip(data, salta) {
-  return _setLinenChangeSkip({ data, salta }, deps);
+export async function setLinenChangeSkip(data, salta, sectionId) {
+  return _setLinenChangeSkip({ data, salta, sectionId }, deps);
 }
 
 // ── Percorso pubblico (residenti, camera autodichiarata) ─────────────────────

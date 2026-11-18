@@ -12,6 +12,7 @@
 
 import * as api from "./api";
 import { version as PACKAGE_VERSION } from "./package.json";
+import { getCachedConfig, parseRoom, resolveRoom, type SectionConfig } from "./sectionsApi";
 
 // ─── Tipi ────────────────────────────────────────────────────────────────────
 
@@ -190,32 +191,59 @@ export function finestraCambioBiancheriaAttiva(d: Date): boolean {
 // ─── Macchine ────────────────────────────────────────────────────────────────
 
 /**
- * Numero di camera valido: Manica 1–50 (zeri iniziali ammessi), Valentino
- * 101–536 (piano 1–5, camera 01–36), lettera a/b finale facoltativa.
- *
- * Stessa regola di src/shared/validation/room.js (parseRoomNumber): vanno
- * tenute allineate a mano. Le funzioni SQL accettano ancora il formato piu'
- * largo `^[0-9]{1,4}(-?[abAB])?$`; il server JS e' il cancello vero.
+ * La camera nella forma canonica: lettera di sezione maiuscola, spazi tolti
+ * ("v112 " -> "V112"). Il suffisso a/b resta com'e'.
  */
-const REGEX_CAMERA = /^(?:0*(?:[1-9]|[1-4][0-9]|50)|[1-5](?:0[1-9]|[1-2][0-9]|3[0-6]))(-?[abAB])?$/;
-export const isValidRoom = (v: string): boolean => REGEX_CAMERA.test(v.trim());
+export function normalizeRoom(v: string): string {
+  const s = v.trim();
+  const m = /^([A-Za-z]{1,2})(.*)$/.exec(s);
+  return m ? m[1].toUpperCase() + m[2] : s;
+}
+
+/**
+ * Chi prenota per un'altra camera della propria sezione di solito scrive solo
+ * le cifre ("112"): se `typed` non comincia con una lettera si usa la lettera
+ * di `ownRoom` ("V112"). Se `ownRoom` non ha una sezione (Direzione, nessuna
+ * camera) o `typed` ha gia' la sua lettera, resta com'e' (normalizzata).
+ */
+export function completeRoom(typed: string, ownRoom: string | null | undefined): string {
+  const t = typed.trim();
+  const own = parseRoom(ownRoom);
+  if (own && /^\d/.test(t)) return own.code + t;
+  return normalizeRoom(t);
+}
+
+/**
+ * Numero di camera valido: una o due lettere di sezione, le cifre, e una
+ * lettera a/b finale facoltativa ("V112", "P21-b"). Le cifre da sole non
+ * bastano piu': l'identita' include la sezione.
+ *
+ * Il controllo SEMANTICO (la sezione esiste e il numero cade in uno dei suoi
+ * intervalli) c'e' solo se la configurazione e' stata caricata; senza, vale
+ * la sintassi e l'ultima parola resta al server (src/shared/validation/room.js
+ * e is_valid_room() in SQL).
+ */
+export function isValidRoom(v: string, config: SectionConfig | null = getCachedConfig()): boolean {
+  const room = normalizeRoom(v);
+  if (!parseRoom(room)) return false;
+  return config ? resolveRoom(config, room) !== null : true;
+}
 
 /**
  * Quali macchine esistono FISICAMENTE nella lavanderia di una camera.
  *
- * Unico posto in cui vive questa regola. Prima la stessa condizione
- * (`num > 0 && num < 100`) era ricopiata in sei punti, ed erano già divergenti:
- * in uno l'elenco delle asciugatrici della Manica era vuoto.
- *
- * Camere 1–99 → Manica: una lavatrice e un'asciugatrice.
- * Dal 100 in su → Valentino: tre e tre.
+ * `pairs` (1–3) e' il numero di coppie lavatrice/asciugatrice di quella
+ * lavanderia, come lo dichiara il server nello snapshot: la lavatrice X
+ * prenota in automatico l'asciugatrice X, quindi i due numeri coincidono.
+ * Prima la regola era "camere 1–99 una coppia, dal 100 in su tre" e dipendeva
+ * dal numero di camera — adesso e' un dato della lavanderia, configurabile.
  */
-export function machinesFor(roomNumber: string | null | undefined): { washers: string[]; dryers: string[] } {
-  const num = parseInt(roomNumber?.match(/^(\d+)/)?.[1] || "0", 10);
-  const manica = num > 0 && num < 100;
-  return manica
-    ? { washers: ["W-A"], dryers: ["D-A"] }
-    : { washers: ["W-A", "W-B", "W-C"], dryers: ["D-A", "D-B", "D-C"] };
+export const DEFAULT_PAIRS = 3;
+
+export function machinesFor(pairs: number): { washers: string[]; dryers: string[] } {
+  const n = Math.min(3, Math.max(1, Math.trunc(pairs) || DEFAULT_PAIRS));
+  const lettere = ["A", "B", "C"].slice(0, n);
+  return { washers: lettere.map((l) => "W-" + l), dryers: lettere.map((l) => "D-" + l) };
 }
 
 /** Chi ha prenotato una certa macchina in un certo turno, se qualcuno. */
@@ -251,7 +279,7 @@ export function nextRef(day: number, slot: number) {
  * uno (`p`) per le asciugatrici e di due (`pp`) per sapere chi c'era prima.
  */
 export function deriveMachines(
-  week: WeekData, status: StatusData, day: number, slot: number, roomNumber: string | null,
+  week: WeekData, status: StatusData, day: number, slot: number, pairs: number,
 ): Machine[] {
   const p  = prevRef(day, slot);
   const pp = prevRef(p.day, p.slot);
@@ -260,7 +288,7 @@ export function deriveMachines(
     return { id, label: id[2], type, status: st, room, prevRoom };
   };
   const out: Machine[] = [];
-  const { washers, dryers } = machinesFor(roomNumber);
+  const { washers, dryers } = machinesFor(pairs);
 
   for (const L of washers.map((id) => id.slice(2))) {
     const wid = "W-" + L;
@@ -311,8 +339,42 @@ export const isCurrentBooking = (b: MyBooking) => b.day === TODAY_DOW && b.slot 
 
 export const favsKey = (room: string | null) => `laundryhub.favs.${room ?? "_"}`;
 
+/** La sezione che esisteva prima delle sezioni: le camere senza lettera erano sue. */
+export const LEGACY_SECTION_CODE = "V";
+
+/**
+ * Migra i preferiti salvati con la camera SENZA lettera ("112") sotto la
+ * camera con la lettera ("V112"), una volta sola.
+ *
+ * - Solo per la sezione storica (V): "P112" non eredita i preferiti della
+ *   "112" di prima, che erano di un'altra camera.
+ * - Se sotto la chiave nuova ci sono gia' preferiti, vincono quelli: la chiave
+ *   vecchia resta com'e' (non si fondono due elenchi).
+ * - La chiave vecchia di un ALTRO numero non si tocca mai.
+ * - Il localStorage puo' lanciare (modalita' privata): tutto in try/catch.
+ * Torna true se ha migrato qualcosa.
+ */
+export function migrateLegacyFavs(room: string | null, storage: Pick<Storage, "getItem" | "setItem" | "removeItem"> = localStorage): boolean {
+  const m = /^([A-Za-z]{1,2})(\d{1,4})/.exec(String(room ?? "").trim());
+  if (!m || m[1].toUpperCase() !== LEGACY_SECTION_CODE) return false;
+  const nuova = favsKey(String(room).trim());
+  const vecchia = `laundryhub.favs.${m[2]}`;
+  try {
+    const esistenti = JSON.parse(storage.getItem(nuova) || "[]");
+    if (Array.isArray(esistenti) && esistenti.length > 0) return false;
+    const grezzo = storage.getItem(vecchia);
+    if (!grezzo) return false;
+    const vecchi = JSON.parse(grezzo);
+    if (!Array.isArray(vecchi) || vecchi.length === 0) { storage.removeItem(vecchia); return false; }
+    storage.setItem(nuova, grezzo);
+    storage.removeItem(vecchia);
+    return true;
+  } catch { return false; }
+}
+
 export function loadFavs(room: string | null): Fav[] {
   if (!room) return [];
+  migrateLegacyFavs(room);
   try {
     const raw = JSON.parse(localStorage.getItem(favsKey(room)) || "[]");
     return Array.isArray(raw)

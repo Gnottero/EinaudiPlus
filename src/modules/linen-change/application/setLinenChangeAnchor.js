@@ -5,10 +5,11 @@
 // di che tipo, e ogni altro martedì — passato o futuro — si ricalcola da lì
 // (vedi linen_change_type_for() in SQL).
 
+import { requireSectionId } from "../../../shared/validation/section.js";
 import { ValidationError, fromRpcError } from "../../../shared/errors/AppError.js";
 import { isValidTipo, isTuesdayISO } from "../domain/schedule.js";
 
-export async function setLinenChangeAnchor({ data, tipo }, { linenChangeRepository }) {
+export async function setLinenChangeAnchor({ data, tipo, sectionId }, { linenChangeRepository }) {
   const value = String(tipo || "");
   if (!isValidTipo(value)) throw new ValidationError("tipo non valido");
 
@@ -16,7 +17,7 @@ export async function setLinenChangeAnchor({ data, tipo }, { linenChangeReposito
   if (!isTuesdayISO(dataValue)) throw new ValidationError("la data deve essere un martedì");
 
   try {
-    return await linenChangeRepository.setAnchor({ data: dataValue, tipo: value });
+    return await linenChangeRepository.setAnchor({ data: dataValue, tipo: value, sectionId: requireSectionId(sectionId) });
   } catch (err) {
     // Vedi la stessa nota in getLinenChangeAnchor.js: senza questo, un
     // fallimento della RPC (non una validazione — quelle sono già gestite

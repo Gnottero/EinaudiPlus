@@ -13,4 +13,9 @@ export const env = {
   get adminSessionSecret() { return process.env.ADMIN_SESSION_SECRET || null; },
   get appToken() { return process.env.APP_TOKEN || null; },
   get cronSecret() { return process.env.CRON_SECRET || null; },
+  // Cloudflare Turnstile (antibot del login amministrativo). Entrambe vuote =
+  // antibot spento (con un avviso nel log), cosi' il login non si blocca finche'
+  // le chiavi non sono state create — vedi DEPLOY.md.
+  get turnstileSecret() { return process.env.TURNSTILE_SECRET_KEY || null; },
+  get turnstileSiteKey() { return process.env.TURNSTILE_SITE_KEY || null; },
 };

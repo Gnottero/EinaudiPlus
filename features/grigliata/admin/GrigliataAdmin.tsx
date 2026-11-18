@@ -4,7 +4,7 @@ import { EMOJI_TICKET, EMOJI_TICKET_DEFAULT, suggerisciEmoji } from "../emojiTic
 import { useAvvisiInTempoReale } from "../../../realtime";
 import { call } from "../../admin-shared/adminApi";
 import { S } from "../../admin-shared/adminStyles";
-import { PIANI, pianoDi, nomePiano, colorePiano } from "../../../piani";
+import { gruppiPresenti, pianoDi, nomePiano, colorePiano } from "../../../piani";
 
 // ─── Grigliata (delegato) ──────────────────────────────────────────────────────
 //
@@ -1547,8 +1547,8 @@ export function GrigliataAdmin() {
 
           {raggruppa === "piano" ? (
             <>
-              {PIANI.map((p) => (
-                <Gruppo key={p} titolo={nomePiano(p)} colore={colorePiano(p)} righe={filtrati.filter((a) => pianoDi(a.room) === p)} />
+              {gruppiPresenti(filtrati.map((a) => a.room)).map((p) => (
+                <Gruppo key={p.key} titolo={nomePiano(p)} colore={colorePiano(p)} righe={filtrati.filter((a) => pianoDi(a.room)?.key === p.key)} />
               ))}
               <Gruppo titolo="Altre" righe={fuoriSchema} />
             </>

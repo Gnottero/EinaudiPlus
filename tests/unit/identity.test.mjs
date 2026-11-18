@@ -13,7 +13,7 @@
 import { authenticate } from "../../src/modules/identity/application/authenticate.js";
 import { changeOwnPassword } from "../../src/modules/identity/application/changeOwnPassword.js";
 import { createAccount, resetAccountPassword, setAccountCamera } from "../../src/modules/identity/application/manageAccounts.js";
-import { authorize, isSysadmin, isStaff, isDelegato, isValidRole } from "../../src/modules/identity/domain/roles.js";
+import { authorize, isAdmin, isSuperadmin, isDelegato, isValidRole } from "../../src/modules/identity/domain/roles.js";
 import { sessioneAncoraValida } from "../../src/modules/identity/domain/sessionState.js";
 import { issueToken, readToken } from "../../src/modules/identity/infrastructure/sessionToken.js";
 import { hashPassword, verifyPassword } from "../../src/modules/identity/infrastructure/passwordHasher.js";
@@ -61,7 +61,7 @@ section("authenticate()");
 {
   const repo = fakeRepository([
     { id: 1, username: "mario", password_hash: hashPassword("Corretta-123"), ruolo: "fdo", attivo: true },
-    { id: 2, username: "disattivato", password_hash: hashPassword("Qualsiasi-1"), ruolo: "staff", attivo: false },
+    { id: 2, username: "disattivato", password_hash: hashPassword("Qualsiasi-1"), ruolo: "fdo", attivo: false },
   ]);
 
   const ok = await authenticate({ username: "mario", password: "Corretta-123" }, { accountRepository: repo, hasher: realHasher });
@@ -116,16 +116,16 @@ section("createAccount() / resetAccountPassword()");
 
   let errore = null;
   try {
-    await createAccount({ username: "nuovo", password: "corta", ruolo: "staff", attore: "sysadmin" }, { accountRepository: repo, hasher: realHasher });
+    await createAccount({ username: "nuovo", password: "corta", ruolo: "fdo", attore: "admin", sectionId: 1 }, { accountRepository: repo, hasher: realHasher });
   } catch (e) { errore = e; }
   check("creazione con password corta -> rifiutata prima di toccare il repository", /almeno 8 caratteri/.test(errore?.message || ""));
   check("e infatti non ha creato nulla", repo._rows.size === 0);
 
-  const creato = await createAccount({ username: "nuovo", password: "Password-123", ruolo: "staff", attore: "sysadmin" }, { accountRepository: repo, hasher: realHasher });
+  const creato = await createAccount({ username: "nuovo", password: "Password-123", ruolo: "fdo", attore: "admin", sectionId: 1 }, { accountRepository: repo, hasher: realHasher });
   check("creazione valida riesce", creato?.ok === true);
 
   const login = await authenticate({ username: "nuovo", password: "Password-123" }, { accountRepository: repo, hasher: realHasher });
-  check("il nuovo account fa login con la password data in creazione", login === "staff");
+  check("il nuovo account fa login con la password data in creazione", login === "fdo");
 
   errore = null;
   try {
@@ -138,8 +138,8 @@ section("setAccountCamera()");
 {
   const chiamate = [];
   const repo = { async setCamera(args) { chiamate.push(args); return { ok: true }; } };
-  await setAccountCamera({ id: "3", camera: " 214 " }, { accountRepository: repo });
-  check("camera ripulita e id numerico", chiamate[0]?.id === 3 && chiamate[0]?.camera === "214", JSON.stringify(chiamate[0]));
+  await setAccountCamera({ id: "3", camera: " V214 " }, { accountRepository: repo });
+  check("camera ripulita e id numerico", chiamate[0]?.id === 3 && chiamate[0]?.camera === "V214", JSON.stringify(chiamate[0]));
   await setAccountCamera({ id: 3, camera: "  " }, { accountRepository: repo });
   check("camera vuota -> null (la toglie)", chiamate[1]?.camera === null);
 
@@ -148,7 +148,7 @@ section("setAccountCamera()");
   check("camera non valida -> rifiutata prima del repository", errore?.message === "numero di camera non valido" && chiamate.length === 2);
 
   errore = null;
-  try { await setAccountCamera({ id: "x", camera: "214" }, { accountRepository: repo }); } catch (e) { errore = e; }
+  try { await setAccountCamera({ id: "x", camera: "V214" }, { accountRepository: repo }); } catch (e) { errore = e; }
   check("id non valido -> rifiutato", /id/.test(errore?.message || ""));
 }
 
@@ -157,16 +157,15 @@ section("setAccountCamera()");
 section("authorize() — policy del modulo Identity");
 {
   const fdo = { u: "mario", r: "fdo" };
-  const staff = { u: "luigi", r: "staff" };
-  const sistemista = { u: "peach", r: "sistemista" };
+  const admin = { u: "peach", r: "admin" };
+  const superadmin = { u: "boss", r: "superadmin" };
   const delegato = { u: "toad", r: "delegato" };
 
   check("FDO non può creare account", authorize(fdo, "accountCreate") === false);
-  check("staff non può creare account", authorize(staff, "accountCreate") === false);
   check("delegato non può creare account", authorize(delegato, "accountCreate") === false);
-  check("sistemista può creare account", authorize(sistemista, "accountCreate") === true);
-  check("sistemista può elencare account", authorize(sistemista, "accountList") === true);
-  check("sistemista può impostare la camera di un account", authorize(sistemista, "accountSetCamera") === true);
+  check("admin può creare account", authorize(admin, "accountCreate") === true);
+  check("admin può elencare account", authorize(admin, "accountList") === true);
+  check("admin può impostare la camera di un account", authorize(admin, "accountSetCamera") === true);
   check("delegato NON può impostare camere (nemmeno la propria)", authorize(delegato, "accountSetCamera") === false);
 
   check("chiunque autenticato può cambiare la propria password", authorize(fdo, "accountChangeOwnPassword") === true);
@@ -174,11 +173,10 @@ section("authorize() — policy del modulo Identity");
   check("nessuno non autenticato può cambiare password", authorize(null, "accountChangeOwnPassword") === false);
 
   check("azione di un altro modulo -> null (non 'affar mio', non un divieto)",
-    authorize(sistemista, "setMachineStatus") === null);
+    authorize(admin, "setMachineStatus") === null);
 
-  check("isSysadmin", isSysadmin(sistemista) === true && isSysadmin(fdo) === false);
-  check("isStaff", isStaff(staff) === true && isStaff(sistemista) === false);
-  check("isDelegato", isDelegato(delegato) === true && isDelegato(sistemista) === false && isDelegato(null) === false);
+  check("isAdmin / isSuperadmin", isAdmin(admin) === true && isAdmin(fdo) === false && isSuperadmin(superadmin) === true && isSuperadmin(admin) === false);
+  check("isDelegato", isDelegato(delegato) === true && isDelegato(admin) === false && isDelegato(null) === false);
   check("ruolo sconosciuto respinto dalla whitelist", isValidRole("portineria") === false);
   check("delegato è un ruolo valido", isValidRole("delegato") === true);
 }

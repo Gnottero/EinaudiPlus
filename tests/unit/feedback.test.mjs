@@ -34,11 +34,11 @@ function fakeRepository() {
 section("submitFeedback()");
 {
   const repo = fakeRepository();
-  await submitFeedback({ room: "112", text: "lavatrice guasta" }, { feedbackRepository: repo });
-  check("passa camera e testo", repo.calls[0].room === "112" && repo.calls[0].text === "lavatrice guasta");
+  await submitFeedback({ room: "V112", text: "lavatrice guasta" }, { feedbackRepository: repo });
+  check("passa camera e testo", repo.calls[0].room === "V112" && repo.calls[0].text === "lavatrice guasta");
 
   const repo2 = fakeRepository();
-  await submitFeedback({ room: "112", text: "  " }, { feedbackRepository: repo2 });
+  await submitFeedback({ room: "V112", text: "  " }, { feedbackRepository: repo2 });
   check("nessuna validazione JS sul testo vuoto (decide il database, fedele all'originale)",
     repo2.calls[0].text === "  ");
 }
@@ -88,20 +88,17 @@ section("adminMarkFeedback()");
 section("authorize() — policy del modulo Feedback");
 {
   const fdo = { u: "mario", r: "fdo" };
-  const staff = { u: "luigi", r: "staff" };
-  const sistemista = { u: "peach", r: "sistemista" };
+  const admin = { u: "peach", r: "admin" };
   const delegato = { u: "toad", r: "delegato" };
 
   // I permessi del delegato stanno per intero nel modulo Grigliata.
   check("il delegato NON può leggere le segnalazioni", authorize(delegato, "feedback") === false);
 
   check("FDO può leggere le segnalazioni", authorize(fdo, "feedback") === true);
-  check("staff NON può leggere le segnalazioni", authorize(staff, "feedback") === false);
-  check("staff NON può marcarle gestite", authorize(staff, "markFeedback") === false);
-  check("sistemista può entrambe", authorize(sistemista, "feedback") === true && authorize(sistemista, "markFeedback") === true);
+  check("admin può entrambe", authorize(admin, "feedback") === true && authorize(admin, "markFeedback") === true);
 
   check("nessuno non autenticato può agire", authorize(null, "feedback") === false);
-  check("azione di un altro modulo -> null", authorize(sistemista, "biciList") === null);
+  check("azione di un altro modulo -> null", authorize(admin, "biciList") === null);
 }
 
 // ─── Esito ────────────────────────────────────────────────────────────────────

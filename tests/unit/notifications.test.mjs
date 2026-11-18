@@ -106,10 +106,10 @@ section("subscribePush()");
 {
   const repo = fakeRepo();
   await subscribePush(
-    { room: "112", endpoint: "https://fcm.googleapis.com/fcm/send/x", p256dh: "a", auth: "b" },
+    { room: "V112", endpoint: "https://fcm.googleapis.com/fcm/send/x", p256dh: "a", auth: "b" },
     { notificationsRepository: repo },
   );
-  check("iscrizione valida passa la camera", repo.calls[0].args.room === "112");
+  check("iscrizione valida passa la camera", repo.calls[0].args.room === "V112");
 
   const repoDirezione = fakeRepo();
   await subscribePush(
@@ -119,7 +119,7 @@ section("subscribePush()");
   check("DIREZIONE ammessa pur non essendo una camera vera", repoDirezione.calls[0].args.room === "DIREZIONE");
 
   const errEndpoint = await throws(() => subscribePush(
-    { room: "112", endpoint: "http://169.254.169.254/latest/meta-data" },
+    { room: "V112", endpoint: "http://169.254.169.254/latest/meta-data" },
     { notificationsRepository: fakeRepo() },
   ));
   check("endpoint non riconosciuto respinto", errEndpoint?.message === "endpoint di notifica non riconosciuto");
@@ -140,8 +140,8 @@ section("unsubscribePush() / createTelegramCode() / link-unlink");
   check("disiscrizione passa l'endpoint", repo.calls[0].args.endpoint === "https://fcm.googleapis.com/x");
 
   const repo2 = fakeRepo();
-  await createTelegramCode({ room: "112" }, { notificationsRepository: repo2 });
-  check("createTelegramCode passa la camera senza validarla (fedele all'originale)", repo2.calls[0].args.room === "112");
+  await createTelegramCode({ room: "V112" }, { notificationsRepository: repo2 });
+  check("createTelegramCode passa la camera senza validarla (fedele all'originale)", repo2.calls[0].args.room === "V112");
 
   const repo3 = fakeRepo();
   await linkTelegramByCode({ code: "ABC12345", chatId: "999" }, { notificationsRepository: repo3 });
@@ -256,7 +256,7 @@ section("notifyRoom()");
   repo.notifyTargetsForRoom = async () => fakeRepo._targets;
   const push = fakeSender();
   const telegram = fakeSender();
-  await notifyRoom({ room: "112", title: "Bici registrata", body: "testo", tag: "bici" }, {
+  await notifyRoom({ room: "V112", title: "Bici registrata", body: "testo", tag: "bici" }, {
     notificationsRepository: repo, pushSender: push, telegramSender: telegram,
   });
   check("avvisa il target push", push.calls.length === 1);
@@ -266,7 +266,7 @@ section("notifyRoom()");
   repoMuto.notifyTargetsForRoom = async () => { throw new Error("db giù"); };
   let esplode = false;
   try {
-    await notifyRoom({ room: "112", title: "x", body: "y" }, { notificationsRepository: repoMuto, pushSender: fakeSender(), telegramSender: fakeSender() });
+    await notifyRoom({ room: "V112", title: "x", body: "y" }, { notificationsRepository: repoMuto, pushSender: fakeSender(), telegramSender: fakeSender() });
   } catch { esplode = true; }
   check("database irraggiungibile non fa fallire la chiamata (silenziosa)", !esplode);
 }
@@ -275,15 +275,15 @@ section("notifyRoom()");
 
 section("authorize() — policy del modulo Notifications");
 {
-  const sistemista = { u: "peach", r: "sistemista" };
+  const admin = { u: "peach", r: "admin" };
   const fdo = { u: "mario", r: "fdo" };
 
   for (const azione of ["pushSubs", "deletePushSub", "telegramSubs", "deleteTelegramSub", "broadcastPush"]) {
-    check(`sistemista può '${azione}'`, authorize(sistemista, azione) === true);
+    check(`admin può '${azione}'`, authorize(admin, azione) === true);
     check(`FDO non può '${azione}'`, authorize(fdo, azione) === false);
   }
   check("nessuno non autenticato può agire", authorize(null, "broadcastPush") === false);
-  check("azione di un altro modulo -> null", authorize(sistemista, "spaces") === null);
+  check("azione di un altro modulo -> null", authorize(admin, "spaces") === null);
 }
 
 // ─── Esito ────────────────────────────────────────────────────────────────────

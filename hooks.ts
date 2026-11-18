@@ -2,7 +2,8 @@
 // feature (es. BookModal in features/laundry): non appartengono a una sola,
 // quindi vivono qui invece che dentro una cartella feature.
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, createContext, useContext } from "react";
+import { featureOn, type FeatureKey, type Section } from "./sectionsApi";
 
 export function useMediaQuery(query: string) {
   const [matches, setMatches] = useState(
@@ -23,7 +24,8 @@ export function useMediaQuery(query: string) {
 // NUOVO a ogni render, quindi finirebbe per staccare e riattaccare
 // l'ascoltatore in continuazione — ed e' cosi' che una tastiera "a volte non
 // risponde".
-export const TASTI_CAMERA = /^[0-9abAB-]$/;
+// Lettere comprese: la camera comincia con la lettera della sezione (V112).
+export const TASTI_CAMERA = /^[A-Za-z0-9-]$/;
 
 /**
  * Rende un tastierino su schermo digitabile anche da tastiera vera.
@@ -40,7 +42,7 @@ export const TASTI_CAMERA = /^[0-9abAB-]$/;
  * o quando sopra c'è il foglio di accesso amministratore — i tasti non li
  * intercetta nessuno.
  *
- * @param max  quante cifre accetta (6 per la camera, 4 nel modale)
+ * @param max  quanti caratteri accetta (la camera: lettera di sezione + cifre + suffisso)
  */
 export function useTastieraFisica(
   attivo: boolean,
@@ -77,3 +79,22 @@ export function useTastieraFisica(
     return () => window.removeEventListener("keydown", onKey);
   }, [attivo, set, max, ammessi]);
 }
+
+// ─── Coppie lavatrice/asciugatrice ───────────────────────────────────────────
+//
+// Quante coppie ha la lavanderia di questa camera (1–3) lo dice il server
+// nello snapshot; App lo mette qui e chi disegna le macchine lo legge, senza
+// farlo passare per le props di ogni componente intermedio.
+
+export const PairsContext = createContext<number>(3);
+export const usePairs = (): number => useContext(PairsContext);
+
+// ─── Sezione di chi guarda ───────────────────────────────────────────────────
+//
+// Le funzionalita' accese o spente della sezione della camera corrente. Stessa
+// logica del contesto delle coppie: chi disegna una scheda o un blocco (le
+// Impostazioni, la card del cambio biancheria) chiede `useFeature("linen")`
+// senza che ogni livello intermedio si porti dietro la sezione. null = non si
+// sa (Direzione, nessuna camera, server vecchio): tutto acceso.
+export const SectionContext = createContext<Section | null>(null);
+export const useFeature = (f: FeatureKey): boolean => featureOn(useContext(SectionContext), f);

@@ -45,15 +45,15 @@ function fakeNotify() {
 section("getBike() / setBike()");
 {
   const repo = fakeRepository();
-  await getBike({ room: "112" }, { bikeRepository: repo });
-  check("lettura valida passa la camera", repo.calls[0].room === "112");
+  await getBike({ room: "V112" }, { bikeRepository: repo });
+  check("lettura valida passa la camera", repo.calls[0].room === "V112");
 
   const err = await throws(() => getBike({ room: "../etc" }, { bikeRepository: fakeRepository() }));
   check("camera malformata respinta (get)", err?.message === "camera non valida");
 
   const repo2 = fakeRepository();
-  await setBike({ room: "112", hasBike: true }, { bikeRepository: repo2 });
-  check("scrittura valida passa camera e valore", repo2.calls[0].room === "112" && repo2.calls[0].hasBike === true);
+  await setBike({ room: "V112", hasBike: true }, { bikeRepository: repo2 });
+  check("scrittura valida passa camera e valore", repo2.calls[0].room === "V112" && repo2.calls[0].hasBike === true);
 
   const err2 = await throws(() => setBike({ room: "", hasBike: true }, { bikeRepository: fakeRepository() }));
   check("camera assente respinta (set)", err2?.message === "camera non valida");
@@ -78,13 +78,13 @@ section("adminDeleteBikeRoom()");
 {
   const notify = fakeNotify();
   const repo = fakeRepository({ deleteResult: { deleted: true } });
-  await adminDeleteBikeRoom({ room: "112" }, { bikeRepository: repo, notifyRoom: notify.fn });
+  await adminDeleteBikeRoom({ room: "V112" }, { bikeRepository: repo, notifyRoom: notify.fn });
   check("bici davvero rimossa -> avvisa il residente", notify.calls.length === 1);
   check("titolo giusto nell'avviso", notify.calls[0][1] === "Bici rimossa");
 
   const notify2 = fakeNotify();
   const repoNoOp = fakeRepository({ deleteResult: { deleted: false } });
-  await adminDeleteBikeRoom({ room: "112" }, { bikeRepository: repoNoOp, notifyRoom: notify2.fn });
+  await adminDeleteBikeRoom({ room: "V112" }, { bikeRepository: repoNoOp, notifyRoom: notify2.fn });
   check("nessuna bici da togliere -> nessun avviso", notify2.calls.length === 0);
 
   const err = await throws(() => adminDeleteBikeRoom({ room: "xyz" }, { bikeRepository: fakeRepository(), notifyRoom: fakeNotify().fn }));
@@ -97,13 +97,13 @@ section("adminAddBikeRoom()");
 {
   const notify = fakeNotify();
   const repo = fakeRepository({ setResult: { inserted: true } });
-  const risultato = await adminAddBikeRoom({ room: "112" }, { bikeRepository: repo, notifyRoom: notify.fn });
+  const risultato = await adminAddBikeRoom({ room: "V112" }, { bikeRepository: repo, notifyRoom: notify.fn });
   check("bici davvero inserita -> avvisa il residente", notify.calls.length === 1);
   check("risultato riporta inserted", risultato.inserted === true);
 
   const notify2 = fakeNotify();
   const repoGiaPresente = fakeRepository({ setResult: { inserted: false } });
-  const risultato2 = await adminAddBikeRoom({ room: "112" }, { bikeRepository: repoGiaPresente, notifyRoom: notify2.fn });
+  const risultato2 = await adminAddBikeRoom({ room: "V112" }, { bikeRepository: repoGiaPresente, notifyRoom: notify2.fn });
   check("bici già segnata -> nessun avviso doppio", notify2.calls.length === 0);
   check("risultato riporta inserted:false", risultato2.inserted === false);
 }
@@ -113,8 +113,7 @@ section("adminAddBikeRoom()");
 section("authorize() — policy del modulo Bikes");
 {
   const fdo = { u: "mario", r: "fdo" };
-  const staff = { u: "luigi", r: "staff" };
-  const sistemista = { u: "peach", r: "sistemista" };
+  const admin = { u: "peach", r: "admin" };
   const delegato = { u: "toad", r: "delegato" };
 
   // I permessi del delegato stanno per intero nel modulo Grigliata.
@@ -122,13 +121,12 @@ section("authorize() — policy del modulo Bikes");
   check("il delegato non può assegnare una bici", authorize(delegato, "biciAddRoom") === false);
 
   check("FDO può leggere l'elenco bici", authorize(fdo, "biciList") === true);
-  check("staff NON può leggere l'elenco bici", authorize(staff, "biciList") === false);
   check("FDO non può fare la pulizia totale", authorize(fdo, "biciPurge") === false);
-  check("sistemista può fare la pulizia totale", authorize(sistemista, "biciPurge") === true);
-  check("solo sistemista può assegnare una bici", authorize(fdo, "biciAddRoom") === false && authorize(sistemista, "biciAddRoom") === true);
+  check("admin può fare la pulizia totale", authorize(admin, "biciPurge") === true);
+  check("solo admin può assegnare una bici", authorize(fdo, "biciAddRoom") === false && authorize(admin, "biciAddRoom") === true);
 
   check("nessuno non autenticato può agire", authorize(null, "biciList") === false);
-  check("azione di un altro modulo -> null", authorize(sistemista, "temaSet") === null);
+  check("azione di un altro modulo -> null", authorize(admin, "temaSet") === null);
 }
 
 // ─── Esito ────────────────────────────────────────────────────────────────────

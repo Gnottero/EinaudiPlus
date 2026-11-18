@@ -14,6 +14,7 @@
 import { readBody, json, fail, botFilterTokenOk, methodOk } from "./_lib/http.js";
 import { checkRateLimit, clientIp } from "../src/shared/http/rateLimit.js";
 import { getBookings, bookSpace, clearBooking, SPACES } from "../src/modules/common-spaces/index.js";
+import { resolveResourceSection } from "../src/modules/sections/index.js";
 import { wrapHandler } from "../src/shared/errors/wrapHandler.js";
 
 export default wrapHandler("rooms", async (req, res) => {
@@ -25,6 +26,20 @@ export default wrapHandler("rooms", async (req, res) => {
   const space = String(req.query.space || body.space || "").trim();
   if (!SPACES.has(space)) return fail(res, "sala non valida");
 
+  // Se il client dice da quale camera sta guardando, la sezione di quella
+  // camera deve avere acceso questo spazio (cinema/music). Senza camera la
+  // lettura resta come prima.
+  // Ora la camera e' OBBLIGATORIA: la sala e' di una sezione, e senza camera non
+  // si sa di quale. La Direzione (un amministratore nell'app) manda al posto
+  // della camera DIREZIONE + `section` (la lettera della sezione in cui lavora).
+  // `sectionId` e' la sezione che POSSIEDE la sala (condivisioni incluse).
+  const feature = space === "cinema" ? "cinema" : "music";
+  const sectionId = await resolveResourceSection({
+    room: String(req.query.room || body.room || "").trim(),
+    sectionCode: String(req.query.section || body.section || "").trim(),
+    feature,
+  });
+
   // Stessa lacuna che c'era su /api/laundry: la lettura usciva prima del
   // limite. Tetto alto per la stessa ragione (il collegio e' dietro NAT, da
   // fuori e' un indirizzo solo per tutti); serve contro chi martella, non
@@ -33,7 +48,7 @@ export default wrapHandler("rooms", async (req, res) => {
     if (!(await checkRateLimit("rooms-read", clientIp(req), 600, 600))) {
       return fail(res, "troppe richieste, riprova fra poco", {}, 429);
     }
-    return json(res, 200, await getBookings(space));
+    return json(res, 200, await getBookings(space, sectionId));
   }
 
   if (!(await checkRateLimit("rooms", clientIp(req), 40, 600))) {
@@ -46,7 +61,7 @@ export default wrapHandler("rooms", async (req, res) => {
   switch (action) {
     case "book":
       return json(res, 200, await bookSpace({
-        space, day: body.day, start: body.start, end: body.end, name: body.name, type: body.type,
+        space, day: body.day, start: body.start, end: body.end, name: body.name, type: body.type, sectionId,
       }));
 
     // 'clear' e' la grafia usata dal client; 'delete' compariva nel refactor
@@ -54,7 +69,7 @@ export default wrapHandler("rooms", async (req, res) => {
     // di allineamento quando quel lavoro rientrera'.
     case "clear":
     case "delete":
-      return json(res, 200, await clearBooking({ space, id: body.id }));
+      return json(res, 200, await clearBooking({ space, id: body.id, sectionId }));
 
     default:
       return fail(res, "azione sconosciuta");

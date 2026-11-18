@@ -19,8 +19,9 @@ export async function getOverview() {
   return _getOverview({}, deps);
 }
 
-export async function listRecurringRules() {
-  return _listRecurringRules({}, deps);
+// `sectionId` null = tutte le sezioni (solo superadmin senza sezione scelta).
+export async function listRecurringRules(sectionId = null) {
+  return _listRecurringRules({ sectionId }, deps);
 }
 
 export async function setRecurringRuleActive(input) {
@@ -31,14 +32,14 @@ export async function deleteRecurringRule(id) {
   return _deleteRecurringRule({ id }, deps);
 }
 
-export async function applyRecurringRules(offset) {
-  return _applyRecurringRules({ offset }, deps);
+export async function applyRecurringRules(offset, sectionId = null) {
+  return _applyRecurringRules({ offset, sectionId }, deps);
 }
 
 export async function purgeData(input) {
   return _purgeData(input, deps);
 }
 
-export async function getCounts() {
-  return _getCounts({}, deps);
+export async function getCounts(sectionId = null) {
+  return _getCounts({ sectionId }, deps);
 }

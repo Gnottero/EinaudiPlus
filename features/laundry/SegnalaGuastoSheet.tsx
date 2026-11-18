@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { usePairs } from "../../hooks";
 import { Wind, Send, AlertTriangle, Wrench } from "lucide-react";
 import { WashingMachine } from "../../icons";
 import { Toast } from "../../pannelli";
@@ -8,11 +9,12 @@ import { RED, RED_FG, OOS_C, OOS_T, GREEN, GREEN_T, type Theme } from "../../tem
 
 // ─── Segnala un guasto ─────────────────────────────────────────────────────────
 
-export function SegnalaGuastoSheet({ lang, status, onStatus, roomNumber }: {
-  theme?: Theme; lang: Lang; status: StatusData; roomNumber: string | null;
+export function SegnalaGuastoSheet({ lang, status, onStatus }: {
+  theme?: Theme; lang: Lang; status: StatusData;
   onStatus: (machine:string, oos:boolean, nota?:string)=>Promise<void>;
 }) {
   const t = T[lang];
+  const pairs = usePairs();
   const [toast, setToast] = useState<string | null>(null);
   // La macchina per cui si sta scrivendo la nota, se si sta scrivendo.
   const [nota, setNota] = useState<{ m: Machine; testo: string } | null>(null);
@@ -25,7 +27,7 @@ export function SegnalaGuastoSheet({ lang, status, onStatus, roomNumber }: {
     id, label: id[2], type, status: status[id] === "oos" ? "out-of-order" : "available",
   });
 
-  const avail = machinesFor(roomNumber);
+  const avail = machinesFor(pairs);
   const washers: Machine[] = avail.washers.map((id)=>mk(id,"washer"));
   const dryers:  Machine[] = avail.dryers.map((id)=>mk(id,"dryer"));
 

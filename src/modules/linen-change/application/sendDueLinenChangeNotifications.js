@@ -24,10 +24,10 @@ export async function sendDueLinenChangeNotifications(_input, { linenChangeRepos
     return { ok: true, inviati: 0 };
   }
 
-  const corpo = TESTO[esito.tipo] ?? TESTO.nessuno;
-
+  // Ogni riga e' { room, tipo }: il tipo del martedi' dipende dalla sezione
+  // (dalla risorsa "cambio biancheria" che la camera usa), non e' uguale per tutti.
   await Promise.all(
-    righe.map((room) => notifyRoom(room, "Cambio biancheria", corpo, "cambio-biancheria")),
+    righe.map(({ room, tipo }) => notifyRoom(room, "Cambio biancheria", TESTO[tipo] ?? TESTO.nessuno, "cambio-biancheria")),
   );
 
   return { ok: true, inviati: righe.length };

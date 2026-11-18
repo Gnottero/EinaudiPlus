@@ -2,11 +2,12 @@
 // amministrativo — 'clear' e 'delete' sono la stessa cosa, vedi
 // api/rooms.js originale per la ragione delle due grafie accettate).
 
+import { requireSectionId } from "../../../shared/validation/section.js";
 import { ValidationError } from "../../../shared/errors/AppError.js";
 import { isValidSpace } from "../domain/spaces.js";
 
-export async function clearBooking({ space, id }, { commonSpacesRepository }) {
+export async function clearBooking({ space, id, sectionId }, { commonSpacesRepository }) {
   const slug = String(space || "").trim();
   if (!isValidSpace(slug)) throw new ValidationError("sala non valida");
-  return commonSpacesRepository.clear({ space: slug, id: String(id || "") });
+  return commonSpacesRepository.clear({ space: slug, id: String(id || ""), sectionId: requireSectionId(sectionId) });
 }

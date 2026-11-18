@@ -2,7 +2,7 @@
 
 App del Collegio Einaudi per prenotare **lavanderia**, **sala cinema** e **sala
 musica**, oltre a funzioni minori (bici, sala polivalente, cambio biancheria,
-grigliate). È una PWA: si installa dal browser e manda promemoria push.
+grigliate), per una o più **sezioni** del collegio. È una PWA: si installa dal browser e manda promemoria push.
 
 ## Com'è fatta
 
@@ -56,17 +56,18 @@ quest'ordine, e nient'altro:
 | 1 | `schema.sql` | tabelle, vincoli, dati iniziali (lavanderie, macchine, sale) |
 | 2 | `functions.sql` | lettura e scrittura di lavanderia e sale, per i residenti |
 | 3 | `admin.sql` | operazioni del pannello, comprese quelle a nome della Direzione |
-| 4 | `sysadmin.sql` | regole ricorrenti e pulizia, riservate al sistemista |
+| 4 | `sysadmin.sql` | regole ricorrenti e pulizia, riservate all'admin della sezione |
 | 5 | `polivalente.sql` | sala polivalente: tabella, agenda, programmazione |
 | 6 | `account.sql` | account amministrativi e cambio password |
 | 7 | `telegram.sql` | collegamento del bot |
 | 8 | `reminders.sql` | promemoria dovuti e potatura periodica |
-| 9 | `bici.sql` | dichiarazione bici per camera, vista di portineria/sistemista |
-| 10 | `tema.sql` | tema stagionale decorativo (Halloween, Natale…), acceso/spento dal sistemista |
-| 11 | `cambio-biancheria.sql` | cambio biancheria del martedì (grande/piccolo), impostato da FDO e sistemista |
-| 12 | `grigliata.sql` | evento grigliata: adesioni, menu, pagamenti — impostato dal delegato e dal sistemista |
-| 13 | `cron.sql` | job `pg_cron` (va personalizzato: contiene dei segnaposto) |
-| 14 | **`permessi.sql`** | **restringe l'esecuzione a `service_role`. Non è facoltativo** |
+| 9 | `bici.sql` | dichiarazione bici per camera, vista di portineria/admin |
+| 10 | `tema.sql` | tema stagionale decorativo (Halloween, Natale…), acceso/spento dall'admin di ogni sezione |
+| 11 | `cambio-biancheria.sql` | cambio biancheria del martedì (grande/piccolo), impostato da FDO e admin di ogni sezione |
+| 12 | `grigliata.sql` | evento grigliata: adesioni, menu, pagamenti — impostato dal delegato e dall'admin di ogni sezione |
+| 13 | `sezioni.sql` | sezioni (lettera + numero + funzioni accese), intervalli di camere, lavanderie con coppie configurabili e condivisibili, ruolo `superadmin` e ambito per sezione degli account. Identico alla migrazione 061 |
+| 14 | `cron.sql` | job `pg_cron` (va personalizzato: contiene dei segnaposto) |
+| 15 | **`permessi.sql`** | **restringe l'esecuzione a `service_role`. Non è facoltativo** |
 
 `permessi.sql` va **per ultimo** e va eseguito: agisce su tutte le funzioni
 già create, e senza di lui ognuna resta invocabile via `/rest/v1/rpc/` da
@@ -82,6 +83,8 @@ perché vanno applicate una alla volta al database che è già in produzione.
 ```bash
 npm install
 npm run dev      # http://localhost:5173, /api compreso
+npm run test:unit  # nessuna rete
+npm run test:sql   # SQL delle sezioni su un Postgres locale usa-e-getta (docker)
 npm test         # gira contro il database VERO: vedi sotto
 npm run build
 ```
@@ -108,9 +111,18 @@ stringa nel browser, e fermerebbe solo chi lo rispettava già. Se un giorno
 arriverà un'autenticazione vera, è nelle funzioni SQL che vanno rimessi i
 controlli.
 
+**Quattro ruoli amministrativi**: `superadmin` (piattaforma: crea sezioni,
+intervalli di camere e lavanderie, sceglie su quale sezione lavora), `admin`
+(amministra UNA sezione: funzioni, risorse condivise, colori dei gruppi di
+camere, account FDO e delegato di quella sezione), `fdo` (portineria della
+sezione) e `delegato` (solo la grigliata). Ogni sezione ha le sue risorse
+(sale, polivalente, cambio biancheria, grigliata, tema), indipendenti per
+default e condivisibili con un'altra sezione.
+
 **Gli amministratori invece hanno un login vero** (cookie httpOnly firmato,
 password con hash scrypt) e i loro poteri sono verificati sul server. Si entra
-digitando `1935` al posto della camera.
+dall'indirizzo `/admin` (nessun link dall'app dei residenti), con nome utente, password e
+verifica anti-bot Cloudflare Turnstile (vedi DEPLOY.md).
 
 ## Documenti
 

@@ -15,6 +15,7 @@ import { logAdminAction } from "../../src/shared/audit/auditLog.js";
 import {
   authenticate, issueToken, setSessionCookie, clearSessionCookie,
   currentAdmin, adminConfigured, accountByUsername, sessioneAncoraValida,
+  verifyAntibot, antibotConfig,
 } from "../../src/modules/identity/index.js";
 import { checkRateLimit, clientIp } from "../../src/shared/http/rateLimit.js";
 import { wrapHandler } from "../../src/shared/errors/wrapHandler.js";
@@ -34,6 +35,8 @@ export default wrapHandler("admin/auth", async (req, res) => {
     // v1.10: la camera associata (delegato/sistemista), per passare fra
     // "la mia camera" e "Direzione" restando connessi.
     let camera = null;
+    let sectionId = null;
+    let ruolo = me?.r ?? null;
     if (me) {
       try {
         const row = await accountByUsername(me.u);
@@ -46,14 +49,21 @@ export default wrapHandler("admin/auth", async (req, res) => {
         else {
           deveCambiare = Boolean(row.deve_cambiare_password);
           camera = row.camera || null;
+          sectionId = row.section_id ?? null;
+          ruolo = row.ruolo ?? ruolo;
         }
       } catch { /* se il database non risponde non si blocca comunque l'accesso */ }
     }
     if (revocato) clearSessionCookie(res);
     const attivo = Boolean(me) && !revocato;
     return json(res, 200, {
-      ok: true, logged: attivo, user: attivo ? me.u : null, role: attivo ? me.r : null,
+      ok: true, logged: attivo, user: attivo ? me.u : null, role: attivo ? ruolo : null,
       deve_cambiare_password: deveCambiare, camera: attivo ? camera : null,
+      // La sezione dell'account (null = superadmin, che non ne ha): il pannello la
+      // usa per mostrare solo cio' che puo' toccare. L'enforcement vero e' in data.js.
+      section_id: attivo ? sectionId : null,
+      // Cosa serve al login per mostrare la verifica anti-bot.
+      antibot: antibotConfig(),
     });
   }
 
@@ -83,6 +93,21 @@ export default wrapHandler("admin/auth", async (req, res) => {
 
   const username = String(body.username || "");
   const password = String(body.password || "");
+
+  // Secondo limite, per NOME UTENTE: il limite per IP non ferma chi ruota
+  // indirizzi su un solo account. Chiave in minuscolo e troncata, cosi' non
+  // si aggira con maiuscole o stringhe lunghe. Fail-closed come l'altro.
+  if (username && !(await checkRateLimit("admin-login-user", username.toLowerCase().slice(0, 64), 10, 900, { failOpen: false }))) {
+    return json(res, 429, { ok: false, error: "troppi tentativi, riprova fra un quarto d'ora" });
+  }
+
+  // Antibot (Cloudflare Turnstile). Prima delle credenziali: un bot non deve
+  // poter sapere se un nome utente esiste, ne' far lavorare scrypt.
+  const antibot = await verifyAntibot(body.antibot_token, clientIp(req));
+  if (!antibot.ok) {
+    await logAdminAction({ actor: username || "(vuoto)", action: "login_antibot_respinto", detail: { ip: clientIp(req) } });
+    return json(res, 403, { ok: false, error: antibot.error, antibot: true });
+  }
 
   const role = await authenticate(username, password);
 

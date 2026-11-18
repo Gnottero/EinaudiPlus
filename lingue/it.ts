@@ -110,7 +110,7 @@ const it = {
   // Voci di navigazione
   navLavanderia: "Lavanderia", navCinema: "Cinema", navMusica: "Musica",
   navMacchine: "Macchine", navSegnalazioni: "Segnalazioni",
-  navRicorrenti: "Ricorrenti", navNotifiche: "Notifiche", navManutenzione: "Manutenzione", navTema: "Tema",
+  navRicorrenti: "Ricorrenti", navNotifiche: "Notifiche", navManutenzione: "Manutenzione", navTema: "Tema", navSezioni: "Sezioni",
   navCambioBiancheria: "Cambio biancheria",
   navGrigliata: "Tombolata",
   navGrigliataAdmin: "Tombolata",
@@ -171,6 +171,9 @@ const it = {
   sessioneAttiva: (r: string): string => `Sessione ${r} attiva: prenoti come Direzione. Per uscire tocca DIREZIONE in alto.`,
   telegramAperto: "Ho aperto Telegram: tocca AVVIA nel bot e sei collegato.",
   usaTastiera: "Puoi anche digitare da tastiera e premere Invio.",
+  roomHint: "Il numero comincia con la lettera della tua sezione, ad esempio V112.",
+  roomFormatError: "Formato non valido. Esempi validi: V112, P21-b. Il numero comincia con la lettera della sezione.",
+  funzioneNonAttiva: "Questa funzione non è attiva per la tua sezione.",
   autoReservedLabel: "inclusa",
   giornoDopo: "(del giorno successivo)",
   navBici: "Bici",

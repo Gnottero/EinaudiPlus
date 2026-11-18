@@ -126,7 +126,7 @@ function InvioNotifica() {
         ))}
       </div>
       {perCamera && (
-        <input style={{ ...S.input, marginBottom: 8 }} placeholder="Camera (es. 112, 21-b)" value={room}
+        <input style={{ ...S.input, marginBottom: 8 }} placeholder="Camera con lettera (es. V112, P21-b)" value={room}
                maxLength={8} onChange={(e) => setRoom(e.target.value)} disabled={busy} />
       )}
 

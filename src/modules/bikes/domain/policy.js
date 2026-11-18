@@ -1,21 +1,12 @@
-// Policy di autorizzazione del modulo Bikes.
+// Autorizzazione del modulo: quale permesso serve a ciascuna delle SUE azioni.
+// Chi ha quel permesso lo dice la matrice in identity/domain/permissions.js
+// (niente `return true` di default: un ruolo non elencato non può).
 //
-// Lettura: FDO e sistemista, non staff. Cancellazione totale (reset
-// annuale) e assegnazione/rimozione per camera: solo sistemista.
+// L'elenco lo vede la portineria (FDO, sistemista); azzerare e modificare e' del sistemista.
 
-import { isSysadmin, isStaff, isDelegato } from "../../identity/index.js";
+import { makeAuthorize, PERMESSI as P } from "../../identity/index.js";
 
-const AZIONI_BIKES = new Set(["biciList", "biciPurge", "biciDeleteRoom", "biciAddRoom"]);
-const SOLO_SISTEMISTA = new Set(["biciPurge", "biciDeleteRoom", "biciAddRoom"]);
-const VIETATE_A_STAFF = new Set(["biciList"]);
-
-export function authorize(claims, action) {
-  if (!AZIONI_BIKES.has(action)) return null;
-  if (!claims) return false;
-  if (SOLO_SISTEMISTA.has(action)) return isSysadmin(claims);
-  // I permessi del delegato stanno per intero nel modulo Grigliata — vedi
-  // la stessa riga in laundry/domain/policy.js.
-  if (isDelegato(claims)) return false;
-  if (VIETATE_A_STAFF.has(action) && isStaff(claims)) return false;
-  return true;
-}
+export const authorize = makeAuthorize({
+  biciList: P.BIKES_VIEW,
+  biciPurge: P.BIKES_MANAGE, biciDeleteRoom: P.BIKES_MANAGE, biciAddRoom: P.BIKES_MANAGE,
+});

@@ -14,12 +14,13 @@ export { authorize } from "./domain/policy.js";
 
 const deps = { conferenceRepository };
 
-export async function getAgenda(giorni) {
-  return _getAgenda({ giorni }, deps);
+// `sectionId`: la sezione che POSSIEDE la sala (gia' risolta, condivisioni incluse).
+export async function getAgenda(giorni, sectionId) {
+  return _getAgenda({ giorni, sectionId }, deps);
 }
 
-export async function listRules() {
-  return _listRules({}, deps);
+export async function listRules(sectionId) {
+  return _listRules({ sectionId }, deps);
 }
 
 export async function addRule(input) {

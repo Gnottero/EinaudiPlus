@@ -1,20 +1,13 @@
-// Policy di autorizzazione del modulo Conference Room.
+// Autorizzazione del modulo: quale permesso serve a ciascuna delle SUE azioni.
+// Chi ha quel permesso lo dice la matrice in identity/domain/permissions.js
+// (niente `return true` di default: un ruolo non elencato non può).
 //
-// La programmano solo gli amministratori "generalisti" (FDO, staff,
-// sistemista) — i residenti la leggono da un endpoint pubblico a sé
-// (getAgenda), che di scrivere non sa proprio. Il delegato no: i suoi
-// permessi stanno per intero nel modulo Grigliata, vedi
-// laundry/domain/policy.js per la stessa nota estesa.
+// Programmare la sala polivalente: ogni ruolo operativo, non il delegato.
 
-import { isDelegato } from "../../identity/index.js";
+import { makeAuthorize, PERMESSI as P } from "../../identity/index.js";
 
-const AZIONI_CONFERENCE = new Set([
-  "conferenzaList", "conferenzaAdd", "conferenzaUpdate", "conferenzaSkip",
-  "conferenzaMove", "conferenzaResetOccorrenza", "conferenzaDelete",
-]);
-
-export function authorize(claims, action) {
-  if (!AZIONI_CONFERENCE.has(action)) return null;
-  if (!claims) return false;
-  return !isDelegato(claims);
-}
+export const authorize = makeAuthorize({
+  conferenzaList: P.CONFERENCE_MANAGE, conferenzaAdd: P.CONFERENCE_MANAGE, conferenzaUpdate: P.CONFERENCE_MANAGE,
+  conferenzaSkip: P.CONFERENCE_MANAGE, conferenzaMove: P.CONFERENCE_MANAGE,
+  conferenzaResetOccorrenza: P.CONFERENCE_MANAGE, conferenzaDelete: P.CONFERENCE_MANAGE,
+});

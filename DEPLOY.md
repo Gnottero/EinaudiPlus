@@ -39,24 +39,41 @@ possono contenere segreti.
 > `SYSADMIN_USER`/`SYSADMIN_PASSWORD_HASH` **non esistono più come
 > meccanismo di login** (migrazione 011, agosto 2026): gli account
 > amministrativi vivono nella tabella `admin_account` e si gestiscono dal
-> pannello (sessione sistemista → scheda **Account**), non da qui. Se quelle
+> pannello (sessione admin o superadmin → scheda **Account**), non da qui. Se quelle
 > variabili sono ancora impostate su Vercel per inerzia, si possono
 > rimuovere: il codice non le legge più, e uno username/password rimasti lì
 > non fanno più entrare nessuno.
 
-Ruoli e poteri (fdo e staff sono identici, restano account distinti perché
-l'audit log registra CHI ha fatto cosa):
+Ruoli e poteri — **quattro ruoli** (v2.0). **La tabella vera e' una sola**, in
+`src/modules/identity/domain/permissions.js`; questa e' la sua copia leggibile
+(il test `tests/unit/permissions.test.mjs` la tiene onesta):
 
-| | fdo / staff | sistemista |
-|---|---|---|
-| Macchine fuori servizio, prenotazioni, segnalazioni, sale, sala conferenze | ✓ | ✓ |
-| Regole ricorrenti, pulizia dei dati, gestione account | | ✓ |
+| | fdo | admin | delegato | superadmin |
+|---|:-:|:-:|:-:|:-:|
+| Prenotazioni per la Direzione, cancellare, sale, sala polivalente | ✓ | ✓ | | ✓ |
+| Macchine fuori servizio, segnalazioni, bici (elenco), cambio biancheria, chiusura sale | ✓ | ✓ | | ✓ |
+| Grigliata | | ✓ | ✓ | ✓ |
+| Ricorrenti, pulizia dati, notifiche, tema, bici (modifica), account di sezione | | ✓ | | ✓ |
+| Nome, funzioni, condivisioni e colori dei piani della propria sezione; coppie di una lavanderia | | ✓ | | ✓ |
+| Creare sezioni, intervalli di camere, lavanderie; nominare un admin | | | | ✓ |
+
+- **`superadmin`**: la piattaforma, senza sezione. Sceglie la sezione su cui
+  lavora (`section_id` nel payload).
+- **`admin`**: l'amministratore di UNA sezione. Gestisce solo gli account `fdo`
+  e `delegato` della propria sezione, mai un altro admin.
+- **`fdo`**, **`delegato`**: come prima, ma legati a una sezione.
+
+Ogni account tranne il superadmin ha **una sezione** (`admin_account.section_id`):
+il server la legge dalla riga a ogni richiesta (non dal cookie) e ogni azione
+agisce solo sulle risorse di quella sezione — lavanderie che usa, camere sue,
+le sue sale, la sua polivalente, la sua grigliata... — oppure su quelle che
+una sezione ha scelto di condividere con lei.
 
 Il controllo è sul server, in `api/admin/data.js`: nascondere le schede nel
 pannello non sarebbe un'autorizzazione.
 
 > Un account creato o con la password reimpostata dal pannello deve
-> cambiarla al primo accesso: il sistemista non arriva mai a conoscere la
+> cambiarla al primo accesso: chi la crea non arriva mai a conoscere la
 > password definitiva di chi crea.
 
 ### Chiavi VAPID — non toccare
@@ -111,6 +128,96 @@ curl -F "url=https://<dominio>/api/telegram" \
 
 Senza queste variabili tutto il resto funziona: il pulsante "Collega" nell'app
 darà errore, e nient'altro.
+
+---
+
+### Antibot del login amministrativo (Cloudflare Turnstile)
+
+| Nome | Valore |
+|---|---|
+| `TURNSTILE_SITE_KEY` | chiave **pubblica** del widget (la legge il browser tramite `/api/admin/auth`) |
+| `TURNSTILE_SECRET_KEY` | chiave **segreta**, solo lato server — verifica il token con Cloudflare |
+
+Si creano da dashboard.cloudflare.com → Turnstile → *Add widget* (hostname:
+`einaudi-plus.vercel.app` e il dominio vero; modalità *Managed*). Servono
+**tutte e due**: con una sola mancante l'antibot resta spento.
+
+- **Senza chiavi l'antibot e' spento** e ogni tentativo di login scrive un
+  avviso nel log (`antibot non configurato`): cosi' il pannello non si blocca
+  finche' le chiavi non esistono, ma "spento" non diventa "dimenticato".
+- **Con le chiavi e' fail-closed**: se Cloudflare non risponde, il login
+  fallisce (messaggio "verifica anti-bot non disponibile") invece di passare.
+- La CSP in `vercel.json` ammette `https://challenges.cloudflare.com` come
+  `script-src` e `frame-src`: non rimuoverla.
+- In piu', il login ha un secondo limite per **nome utente** (10 tentativi ogni
+  quindici minuti) oltre a quello per IP (5).
+
+### Sezioni (v2.0) — rilascio, **nell'ordine**
+
+La v2.0 introduce le **sezioni**: ogni camera diventa `<lettera><numero>`
+(`V112`, `P21-b`), le funzioni si accendono e spengono per sezione, gli
+intervalli di camere e le lavanderie si configurano dal pannello. Tocca lo
+schema in produzione e **non esiste uno staging**: il codice e le migrazioni
+sono stati provati su un Postgres locale usa-e-getta (`npm run test:sql`,
+richiede docker), mai su Supabase. Prima di applicare:
+
+1. **Backup.** Dashboard Supabase → Database → Backups, oppure un `pg_dump`.
+   La migrazione riscrive le camere in 9 tabelle.
+2. **Finestra breve, meglio la notte.** Il taglio e' netto ("hard cut"):
+   subito dopo la migrazione il server rifiuta le camere senza lettera, e il
+   vecchio client (che le manda senza) smette di prenotare finche' non viene
+   rilasciato il nuovo. Migrazione e deploy vanno fatti a poca distanza.
+3. **Applica la migrazione** (una transazione unica, rieseguibile):
+   ```bash
+   node scripts/db.cjs apply supabase/migrations/061-sezioni.sql
+   ```
+   Verifica subito:
+   ```bash
+   node scripts/db.cjs query "select code, name from section"          # V | Valentino
+   node scripts/db.cjs query "select room from laundry_booking limit 3" # V112, ...
+   node scripts/db.cjs query "select count(*) from laundry_booking where room ~ '^[0-9]'"  # 0
+   ```
+4. **Deploy** del codice (`git push` su main, o `vercel --prod`).
+5. **Promuovi un account a superadmin** — la migrazione non lo fa da sola,
+   altrimenti nessuno potrebbe creare sezioni (la migrazione ha gia' trasformato
+   `sistemista` in `admin` e `staff` in `fdo`, tutti nella sezione V):
+   ```bash
+   node scripts/db.cjs query "update admin_account set ruolo = 'superadmin', section_id = null where username = 'IL_TUO_USERNAME'"
+   ```
+   **Cambio di comportamento, dichiarato**: `sistemista` -> `admin` e `staff` ->
+   `fdo`. L'`admin` e' il vecchio sistemista ma limitato alla sua sezione (V);
+   lo staff guadagna le funzioni di portineria dell'fdo (macchine,
+   segnalazioni, bici, cambio biancheria). Se non lo vuoi, disattiva quegli
+   account PRIMA di applicare. I cookie di sessione col vecchio ruolo non valgono
+   piu': tutti rifanno l'accesso. Il superadmin crea le altre sezioni dalla
+   scheda **Sezioni** del pannello e nomina i loro admin.
+6. **Prova a mano**: entra come `V112` e come una camera della Manica (`V21`),
+   prenota, cancella; apri il pannello; mettila alla prova con una camera senza
+   lettera (`112`) — deve dare "camera non valida".
+7. I residenti con un `112` salvato nel telefono vengono avvisati al primo
+   avvio di aggiungere la lettera: la camera salvata viene svuotata.
+
+**Rollback**: non esiste uno "scarica" automatico della migrazione. Dal backup
+si ripristina; a mano: togliere la `V` dalle camere (`update <tabella> set room
+= substr(room, 2) where room ~ '^V[0-9]'`, nelle 9 tabelle elencate in 061),
+`drop table section_range, section` e rimettere i vecchi vincoli. Meglio non
+doverlo fare: per questo il punto 1.
+
+**Le risorse sono per-sezione, non del collegio intero.** La migrazione assegna
+alla sezione V tutto cio' che c'era (sale, sala polivalente, grigliata,
+ancora del cambio biancheria e martedi' saltati, tema, segnalazioni). Una
+sezione nuova parte con le proprie sale cinema/musica e nient'altro, e tutte
+le risorse sono **indipendenti** finche' un admin non sceglie di condividerne
+una con un'altra sezione (scheda Sezioni: `section.shared_with`, per cinema,
+musica, polivalente, cambio biancheria, grigliata, tema; la lavanderia si
+condivide dagli intervalli di camere). Niente catene: se Mole usa la polivalente
+di Valentino, Valentino non puo' usare quella di un'altra. Chi condivide una
+risorsa la modifica da tutte e due le parti.
+
+L'API pubblica ora vuole la **camera** per sale e polivalente
+(`/api/rooms?space=cinema&room=V112`, `/api/conferenze?room=V112`): senza,
+`camera mancante`. Un amministratore che usa l'app "da Direzione" manda
+`room=DIREZIONE&section=V` (la lettera della sezione in cui lavora).
 
 ---
 
@@ -200,7 +307,7 @@ Sul preview, con un telefono vero.
    ereditato dal vecchio Apps Script) e sembrava che le notifiche di
    asciugatrice e ritiro fossero rotte. Se dovessero servire di nuovo:
    `update laundry set reminder_mode = 'single' where slug = 'valentino';`
-5. Digita **1935** al posto della camera: si apre l'accesso amministratore.
+5. Apri **/admin**: si apre l'accesso amministratore.
    Entra, metti una macchina fuori servizio e verifica che
    nell'app compaia come guasta **ma resti prenotabile con un avviso**
 6. Segnala un guasto e controlla che compaia nella sezione Segnalazioni
@@ -309,7 +416,7 @@ Agosto 2026, saltando la finestra di osservazione su decisione esplicita:
   trova Macchine, Segnalazioni — e da sistemista Ricorrenti e Manutenzione —
   nella stessa lista di Lavanderia, Cinema e Musica.
 
-  **Si entra digitando `1935` al posto del numero di camera.** Non è una
+  **Si entra da `/admin`** (dal v2.0; prima si digitava `1935` al posto della camera). Non è una
   password: chi lo digita vede solo il form di login, che resta l'unica cosa
   che conta. Tenerlo lì invece che nel menu evita a ogni residente una voce che
   non potrebbe comunque usare.

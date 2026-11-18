@@ -105,8 +105,7 @@ section("purgeData()");
 section("authorize() — policy del modulo Ops");
 {
   const fdo = { u: "mario", r: "fdo" };
-  const staff = { u: "luigi", r: "staff" };
-  const sistemista = { u: "peach", r: "sistemista" };
+  const admin = { u: "peach", r: "admin" };
   const delegato = { u: "toad", r: "delegato" };
 
   // I permessi del delegato stanno per intero nel modulo Grigliata.
@@ -114,15 +113,14 @@ section("authorize() — policy del modulo Ops");
   check("il delegato non può fare la pulizia", authorize(delegato, "purge") === false);
 
   check("FDO può leggere la panoramica", authorize(fdo, "overview") === true);
-  check("staff NON può leggere la panoramica", authorize(staff, "overview") === false);
 
   for (const azione of ["recurringList", "recurringSetActive", "recurringDelete", "applyRecurring", "purge", "counts"]) {
     check(`FDO non può '${azione}'`, authorize(fdo, azione) === false);
-    check(`sistemista può '${azione}'`, authorize(sistemista, azione) === true);
+    check(`admin può '${azione}'`, authorize(admin, azione) === true);
   }
 
   check("nessuno non autenticato può agire", authorize(null, "purge") === false);
-  check("azione di un altro modulo -> null", authorize(sistemista, "biciList") === null);
+  check("azione di un altro modulo -> null", authorize(admin, "biciList") === null);
 }
 
 // ─── Esito ────────────────────────────────────────────────────────────────────

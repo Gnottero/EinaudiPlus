@@ -4,7 +4,7 @@ import {
   Delete, X, Wrench, Loader2,
   Film, Music, Menu,
   MessageSquare, LogOut,
-  Settings, Repeat, Eraser, Presentation, UserCog, Bike, Sparkles, Bell, Bed, Flame,
+  Settings, Repeat, Eraser, Presentation, UserCog, Bike, Sparkles, Bell, Bed, Flame, Layers,
 } from "lucide-react";
 import * as api from "./api";
 import * as push from "./push";
@@ -16,14 +16,15 @@ import AccessibilityPanel from "./features/accessibility/AccessibilityPanel";
 import { loadPrefs, savePrefs, applyToDOM, type AccessibilityPrefs } from "./statusConfig";
 import type { Role as AdminRole, Tab as AdminTab } from "./AdminPanel";
 import { WashingMachine } from "./icons";
-import { useMediaQuery, useTastieraFisica, TASTI_CAMERA } from "./hooks";
+import { useMediaQuery, useTastieraFisica, TASTI_CAMERA, PairsContext, SectionContext } from "./hooks";
+import { loadSectionConfig, resolveRoom, featureOn, type FeatureKey, type Section, type SectionConfig } from "./sectionsApi";
 import { Dashboard, DaySchedule, WeekOverview, SegnalaGuastoSheet } from "./features/laundry";
 import { FeedbackModal } from "./features/feedback/FeedbackModal";
 
 // Le regole della lavanderia (turni, macchine, prenotazioni) e i testi stanno
 // in file loro: qui restano i componenti. Vedi modello.ts, i18n.ts, tema.ts.
 import {
-  APP_VERSION, isValidRoom,
+  APP_VERSION, isValidRoom, normalizeRoom,
   favsKey, loadFavs,
   type WeekData, type StatusData, type Fav,
 } from "./modello";
@@ -55,7 +56,7 @@ const CambiaPasswordObbligata = lazy(() => import("./AdminPanel").then((m) => ({
 // delegato vede chi ha aderito).
 type Facility = "laundry" | "cinema" | "music" | "conferenze" | "bike" | "grigliata" | "guasto" | "impostazioni" | "feedback" | AdminTab;
 
-const ADMIN_TABS: AdminTab[] = ["macchine", "segnalazioni", "bici", "account", "ricorrenti", "notifiche", "manutenzione", "tema", "cambiobiancheria", "grigliataAdmin"];
+const ADMIN_TABS: AdminTab[] = ["macchine", "segnalazioni", "bici", "account", "ricorrenti", "notifiche", "manutenzione", "tema", "cambiobiancheria", "grigliataAdmin", "sezioni"];
 const isAdminFacility = (f: Facility): f is AdminTab => (ADMIN_TABS as string[]).includes(f);
 
 /** Etichetta della camera nell'intestazione. Chi amministra è la Direzione. */
@@ -70,16 +71,33 @@ const roomLabel = (room: string | null, t: { changeRoom: string; room: string })
 // aggiornate da App.handleAccessibilityChange. Evita il prop-drilling profondo.
 let accessibilityPrefs: AccessibilityPrefs = loadPrefs();
 
+// ─── Camera salvata ───────────────────────────────────────────────────────────
+
+/**
+ * La camera ricordata su questo dispositivo, o null.
+ *
+ * Dalla v2.0 la camera comincia con la lettera della sezione (V112). Una camera
+ * salvata prima, fatta di sole cifre ("112"), non dice di quale sezione e il
+ * server la rifiuterebbe: la si dimentica e si rimostra l'accesso (che spiega
+ * il nuovo formato). "" (Continua senza accedere) e DIREZIONE restano come sono.
+ */
+function readStoredRoom(): string | null {
+  try {
+    const r = localStorage.getItem("laundryhub.room");
+    if (r && r !== api.DIREZIONE && !/^[A-Za-z]/.test(r)) {
+      localStorage.removeItem("laundryhub.room");
+      return null;
+    }
+    return r;
+  } catch {
+    return null;
+  }
+}
+
 // ─── Login screen ─────────────────────────────────────────────────────────────
 
-// Il numero che apre l'accesso amministratore invece di entrare in una camera.
-// Non è una password — chi lo conosce vede solo il form di login — ma tiene la
-// voce fuori dal menu dei residenti, dove non serviva a nessuno di loro.
-// 1935: l'anno di fondazione del collegio.
-const ROOM_ADMIN = "1935";
-
-function LoginScreen({ lang, onLogin, onAdmin }: {
-  theme?: Theme; lang: Lang; onLogin: (room: string) => void; onAdmin: () => void;
+function LoginScreen({ lang, config, onLogin }: {
+  theme?: Theme; lang: Lang; config: SectionConfig | null; onLogin: (room: string) => void;
 }) {
   const t = T[lang];
   const [room, setRoom] = useState("");
@@ -90,16 +108,16 @@ function LoginScreen({ lang, onLogin, onAdmin }: {
 
   function submit() {
     if (room.length === 0) return;
-    if (room === ROOM_ADMIN) { setRoom(""); onAdmin(); return; }
-    if (!isValidRoom(room)) {
-      alert("Formato non valido. Esempi validi: 112, 21-b, 112A (Manica 1–50, Valentino 101–536)");
+    const r = normalizeRoom(room);
+    if (!isValidRoom(r, config)) {
+      alert(t.roomFormatError);
       return;
     }
-    onLogin(room);
+    onLogin(r);
   }
 
   // La tastiera fisica: vale sempre in questa schermata. Vedi useTastieraFisica.
-  useTastieraFisica(true, setRoom, submit, 6, TASTI_CAMERA);
+  useTastieraFisica(true, setRoom, submit, 8, TASTI_CAMERA);
 
   return (
     <div className="flex flex-col items-center justify-center flex-1 px-6">
@@ -111,28 +129,52 @@ function LoginScreen({ lang, onLogin, onAdmin }: {
         <p className="text-sm text-center leading-relaxed" style={{ color:sub }}>
           {t.enterRoom}
         </p>
+        {/* Dalla v2.0 la camera comincia con la lettera della sezione: chi
+            aveva salvato solo le cifre se lo ritrova qui, spiegato. */}
+        <p className="text-xs text-center leading-relaxed mt-1.5" style={{ color:sub }}>
+          {t.roomHint}
+        </p>
       </div>
 
       <div className="w-full rounded-2xl px-5 py-4 mb-5 flex items-center justify-between border" style={{ background:surf, borderColor:"var(--border)" }}>
         <span className="text-sm font-mono" style={{ color:sub }}>{t.room}</span>
         <span className="text-4xl font-mono font-bold tabular-nums" style={{ color:room?fg:`color-mix(in srgb, var(--foreground) 15%, transparent)` }}>
-          {room || "—"}
+          {normalizeRoom(room) || "—"}
         </span>
       </div>
+
+      {/* Le lettere delle sezioni, se la configurazione e' arrivata: un tocco
+          mette (o cambia) il prefisso senza dover aprire la tastiera. Senza
+          configurazione la lettera si scrive da tastiera, come prima. */}
+      {(config?.sections ?? []).some((x) => x.active) && (
+        <div className="flex flex-wrap justify-center gap-2 w-full mb-3">
+          {(config?.sections ?? []).filter((x) => x.active).map((x) => {
+            const attiva = /^[A-Za-z]+/.exec(normalizeRoom(room))?.[0] === x.code;
+            return (
+              <button key={x.id}
+                onClick={()=>setRoom((r) => x.code + r.replace(/^[A-Za-z]+/, ""))}
+                className="rounded-xl px-3 h-9 text-sm font-bold transition-all active:scale-95"
+                style={attiva ? { background:RED, color:RED_FG } : { background:chip, color:fg }}>
+                {x.code}<span className="ml-1.5 text-[11px] font-medium opacity-70">{x.name}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       <div className="grid grid-cols-4 gap-2.5 w-full mb-4">
         {/* setRoom(r => …) e non setRoom(room + k): due tocchi nello stesso
             istante leggerebbero entrambi lo stesso valore vecchio e la prima
             cifra andrebbe persa. Con la forma funzionale si accodano. */}
         {["1","2","3","A", "4","5","6","B", "7","8","9","-"].map((k)=>(
-          <button key={k} onClick={()=>setRoom(r=>r.length<6?r+k:r)}
+          <button key={k} onClick={()=>setRoom(r=>r.length<8?r+k:r)}
             className="rounded-2xl h-14 text-xl font-bold transition-all active:scale-95"
             style={{ background:chip, color:fg }}>{k}</button>
         ))}
         <button onClick={()=>setRoom(r=>r.slice(0,-1))}
           className="rounded-2xl h-14 flex items-center justify-center transition-all active:scale-95 col-span-1"
           style={{ background:chip, color:sub }}><Delete size={20}/></button>
-        <button onClick={()=>setRoom(r=>r.length<6?r+"0":r)}
+        <button onClick={()=>setRoom(r=>r.length<8?r+"0":r)}
           className="rounded-2xl h-14 text-xl font-bold transition-all active:scale-95 col-span-1"
           style={{ background:chip, color:fg }}>0</button>
         <button onClick={submit}
@@ -169,13 +211,13 @@ function LoginScreen({ lang, onLogin, onAdmin }: {
 
 // ─── Sidebar desktop ──────────────────────────────────────────────────────────
 
-function DesktopSidebar({ lang, roomNumber, showNav, facility, onFacility, adminRole, onChangeRoom, grigliataAttiva }: {
+function DesktopSidebar({ lang, roomNumber, showNav, facility, onFacility, adminRole, onChangeRoom, grigliataAttiva, section }: {
   lang: Lang;
   roomNumber: string | null; showNav: boolean;
   facility: Facility; onFacility: (f: Facility) => void;
   adminRole: AdminRole | null;
   onChangeRoom: () => void;
-  grigliataAttiva: boolean;
+  grigliataAttiva: boolean; section: Section | null;
 }) {
   const t   = T[lang];
   const fg  = "var(--foreground)";
@@ -200,7 +242,7 @@ function DesktopSidebar({ lang, roomNumber, showNav, facility, onFacility, admin
             dashboard, e si torna indietro dall'interruttore in cima a
             ciascuna vista — e tenerle qui faceva del desktop una navigazione
             diversa da quella del telefono, per le stesse tre schermate. */}
-        {showNav && facilitiesFor(roomNumber, grigliataAttiva).map(({ id, icon: Icon, chiave }) => {
+        {showNav && facilitiesFor(roomNumber, grigliataAttiva, section).map(({ id, icon: Icon, chiave }) => {
           const isActive = facility === id;
           return (
             <button key={id} onClick={()=>onFacility(id)}
@@ -261,7 +303,7 @@ function DesktopSidebar({ lang, roomNumber, showNav, facility, onFacility, admin
             un vicolo cieco raggiungibile solo da desktop, perche' sul
             telefono l'hamburger che apre queste stesse voci e' gia' dietro
             lo stesso showChrome. */}
-        {showNav && PAGINE_UTILITA.map(({ id, chiave }) => {
+        {showNav && utilityPagesFor(section).map(({ id, chiave }) => {
           const Icona = id === "guasto" ? Wrench : id === "impostazioni" ? Settings : MessageSquare;
           const attiva = facility === id;
           return (
@@ -322,11 +364,34 @@ const FACILITIES: {
 //
 // `grigliataAttiva` viene dal server (vedi App(), stato omonimo): senza
 // un evento in corso la scheda sparisce, non resta li' vuota o disabilitata.
-const facilitiesFor = (roomNumber: string | null, grigliataAttiva: boolean) =>
+//
+// `section` e' la sezione della camera: se ha spento una funzionalita' la sua
+// voce non compare (vedi FUNZIONE_DI). Anche questo non e' un'autorizzazione —
+// il server rifiuta comunque (403) — ma non si promette cio' che non c'e'.
+const FUNZIONE_DI: Partial<Record<Facility, FeatureKey>> = {
+  laundry: "laundry", cinema: "cinema", music: "music", conferenze: "conference",
+  bike: "bikes", grigliata: "grigliata",
+};
+
+const facilitiesFor = (roomNumber: string | null, grigliataAttiva: boolean, section: Section | null) =>
   FACILITIES.filter((f) =>
     (f.id !== "bike" || roomNumber !== api.DIREZIONE) &&
-    (f.id !== "grigliata" || (grigliataAttiva && roomNumber !== api.DIREZIONE))
+    (f.id !== "grigliata" || (grigliataAttiva && roomNumber !== api.DIREZIONE)) &&
+    featureOn(section, FUNZIONE_DI[f.id]!)
   );
+
+/** La struttura o pagina di utilita' e' spenta dalla sezione? */
+const facilityOff = (f: Facility, section: Section | null): boolean => {
+  const fn = FUNZIONE_DI[f];
+  if (fn) return !featureOn(section, fn);
+  // Segnalare un guasto e' una segnalazione di una lavatrice: servono entrambe.
+  if (f === "guasto") return !featureOn(section, "feedback") || !featureOn(section, "laundry");
+  if (f === "feedback") return !featureOn(section, "feedback");
+  return false;
+};
+
+const utilityPagesFor = (section: Section | null) =>
+  PAGINE_UTILITA.filter((p) => !facilityOff(p.id, section));
 
 // Le voci fuori dall'elenco `ruoli` non compaiono con quella sessione, ma il
 // controllo vero resta sul server: nascondere una voce non è un'autorizzazione.
@@ -339,37 +404,40 @@ const facilitiesFor = (roomNumber: string | null, grigliataAttiva: boolean) =>
 // chi PUO' vedere una voce, invece di chi non puo', non lascia questo buco.
 const ADMIN_SECTIONS: {
   id: AdminTab; icon: any;
-  chiave: "navMacchine" | "navSegnalazioni" | "navBici" | "navAccount" | "navRicorrenti" | "navNotifiche" | "navManutenzione" | "navTema" | "navCambioBiancheria" | "navGrigliataAdmin";
+  chiave: "navMacchine" | "navSegnalazioni" | "navBici" | "navAccount" | "navRicorrenti" | "navNotifiche" | "navManutenzione" | "navTema" | "navCambioBiancheria" | "navGrigliataAdmin" | "navSezioni";
   ruoli: AdminRole[];
 }[] = [
   // Macchine e segnalazioni restano affari di FDO e sistemista: lo staff
   // prenota per conto della Direzione come l'FDO, ma non deve vedere lo
   // stato guasto/funzionante delle macchine ne' le segnalazioni. Il delegato
   // no in ogni caso: i suoi permessi stanno per intero nella Grigliata.
-  { id: "macchine",       icon: Wrench,        chiave: "navMacchine",     ruoli: ["fdo", "sistemista"] },
+  { id: "macchine",       icon: Wrench,        chiave: "navMacchine",     ruoli: ["fdo", "admin", "superadmin"] },
   // Stesso livello di Macchine: decisione operativa di portineria (FDO e
   // sistemista), non un'estetica come Tema qui sotto.
-  { id: "cambiobiancheria", icon: Bed,         chiave: "navCambioBiancheria", ruoli: ["fdo", "sistemista"] },
-  { id: "segnalazioni",   icon: MessageSquare, chiave: "navSegnalazioni", ruoli: ["fdo", "sistemista"] },
+  { id: "cambiobiancheria", icon: Bed,         chiave: "navCambioBiancheria", ruoli: ["fdo", "admin", "superadmin"] },
+  { id: "segnalazioni",   icon: MessageSquare, chiave: "navSegnalazioni", ruoli: ["fdo", "admin", "superadmin"] },
   // Quali camere hanno una bici: la vede chi e' in portineria, come le
   // macchine e le segnalazioni. Cancellarle tutte (reset annuale) resta al
   // sistemista — il pulsante compare solo a lui dentro la sezione stessa.
-  { id: "bici",           icon: Bike,          chiave: "navBici",         ruoli: ["fdo", "sistemista"] },
+  { id: "bici",           icon: Bike,          chiave: "navBici",         ruoli: ["fdo", "admin", "superadmin"] },
   // Il delegato vede SOLO questa, oltre al sistemista che vede tutto.
-  { id: "grigliataAdmin", icon: Flame,         chiave: "navGrigliataAdmin", ruoli: ["delegato", "sistemista"] },
+  { id: "grigliataAdmin", icon: Flame,         chiave: "navGrigliataAdmin", ruoli: ["delegato", "admin", "superadmin"] },
   // La programmazione della sala polivalente non e' piu' una scheda a se':
   // vive dentro la sezione "Polivalente" stessa (vedi Conferenze.tsx), visibile
   // li' a chiunque abbia una sessione admin — non serve piu' una voce qui.
   // Chi crea e disattiva gli account e' una decisione dello stesso livello di
   // "chi puo' cancellare tutto": resta al sistemista.
-  { id: "account",        icon: UserCog,       chiave: "navAccount",      ruoli: ["sistemista"] },
-  { id: "ricorrenti",     icon: Repeat,        chiave: "navRicorrenti",   ruoli: ["sistemista"] },
-  { id: "notifiche",      icon: Bell,          chiave: "navNotifiche",    ruoli: ["sistemista"] },
-  { id: "manutenzione",   icon: Eraser,        chiave: "navManutenzione", ruoli: ["sistemista"] },
+  { id: "account",        icon: UserCog,       chiave: "navAccount",      ruoli: ["admin", "superadmin"] },
+  { id: "ricorrenti",     icon: Repeat,        chiave: "navRicorrenti",   ruoli: ["admin", "superadmin"] },
+  { id: "notifiche",      icon: Bell,          chiave: "navNotifiche",    ruoli: ["admin", "superadmin"] },
+  { id: "manutenzione",   icon: Eraser,        chiave: "navManutenzione", ruoli: ["admin", "superadmin"] },
   // Decorazione dell'app (neve, pipistrelli...), acceso/spento a piacere:
   // stesso livello di privilegio di Account e Manutenzione, non perche' sia
   // rischioso quanto quelli, ma perche' cambia cosa vede OGNI residente.
-  { id: "tema",           icon: Sparkles,      chiave: "navTema",        ruoli: ["sistemista"] },
+  // Funzioni e coppie della propria sezione (sistemista); creare sezioni e
+  // intervalli e' del superadmin, lo applica il server.
+  { id: "sezioni",        icon: Layers,        chiave: "navSezioni",     ruoli: ["admin", "superadmin"] },
+  { id: "tema",           icon: Sparkles,      chiave: "navTema",        ruoli: ["admin", "superadmin"] },
 ];
 
 const adminSectionsFor = (role: AdminRole | null) =>
@@ -397,11 +465,11 @@ const PAGINE_UTILITA: { id: "guasto" | "impostazioni" | "feedback"; chiave: "rep
 // regole su chi vede cosa. Manca solo l'annidamento delle schede della
 // lavanderia: quelle non ci sono piu' da nessuna parte, si arriva al
 // giornaliero e alla settimana dai due pulsanti della dashboard.
-function MenuStrutture({ aperto, onClose, facility, onChange, lang, adminRole, roomNumber, grigliataAttiva }: {
+function MenuStrutture({ aperto, onClose, facility, onChange, lang, adminRole, roomNumber, grigliataAttiva, section }: {
   aperto: boolean; onClose: ()=>void;
   facility: Facility; onChange: (f: Facility)=>void;
   lang: Lang; adminRole: AdminRole | null; roomNumber: string | null;
-  grigliataAttiva: boolean;
+  grigliataAttiva: boolean; section: Section | null;
 }) {
   const sub      = "var(--gray-accessible-text)";
   const div      = "var(--border)";
@@ -444,7 +512,7 @@ function MenuStrutture({ aperto, onClose, facility, onChange, lang, adminRole, r
         </div>
 
         <div className="flex-1 overflow-y-auto overscroll-contain px-3 py-2 flex flex-col gap-0.5">
-          {facilitiesFor(roomNumber, grigliataAttiva).map(({ id, icon, chiave }) => (
+          {facilitiesFor(roomNumber, grigliataAttiva, section).map(({ id, icon, chiave }) => (
             <Voce key={id} id={id} icon={icon} label={T[lang][chiave]}/>
           ))}
 
@@ -468,7 +536,7 @@ function MenuStrutture({ aperto, onClose, facility, onChange, lang, adminRole, r
             una volta all'anno. Qui sta con le altre cose che non sono
             strutture. */}
         <div className="shrink-0 px-3 py-2 flex flex-col gap-0.5" style={{ borderTop:`1px solid ${div}` }}>
-          {PAGINE_UTILITA.map(({ id, chiave }) => {
+          {utilityPagesFor(section).map(({ id, chiave }) => {
             const Icona = id === "guasto" ? Wrench : id === "impostazioni" ? Settings : MessageSquare;
             const attiva = facility === id;
             return (
@@ -590,9 +658,7 @@ export default function App() {
       : t);
   }, []);
   const [lang,   setLang]     = useState<Lang>(linguaIniziale);
-  const [roomNumber] = useState<string | null>(() => {
-    try { return localStorage.getItem("laundryhub.room"); } catch { return null; }
-  });
+  const [roomNumber] = useState<string | null>(readStoredRoom);
   const [week,   setWeek]     = useState<WeekData>({});
   const [status, setStatus]   = useState<StatusData>({});
   // Tema stagionale deciso dal sistemista (vedi AdminPanel → Tema): non e'
@@ -605,12 +671,22 @@ export default function App() {
   // Solo se mostrare la voce "Grigliata" in navigazione: il contenuto vero
   // lo legge la scheda stessa quando si apre (vedi features/grigliata).
   const [grigliataAttiva, setGrigliataAttiva] = useState(false);
+  // Dallo snapshot: coppie lavatrice/asciugatrice della lavanderia di questa
+  // camera e sezione della camera (le sue funzionalita' accese/spente).
+  const [pairs, setPairs] = useState(3);
+  const [section, setSection] = useState<Section | null>(null);
+  // La configurazione pubblica delle sezioni: serve alla schermata di accesso
+  // (lettere disponibili) e a controllare la camera prima del giro di rete.
+  // Fail-soft: senza, l'app funziona e il server decide.
+  const [sectionConfig, setSectionConfig] = useState<SectionConfig | null>(null);
+  useEffect(() => { loadSectionConfig().then(setSectionConfig); }, []);
+  // La sezione che comanda le funzionalita': quella dello snapshot, o (se lo
+  // snapshot non l'ha data, es. server vecchio) quella ricavata dalla config.
+  const sezione = section ?? resolveRoom(sectionConfig, roomNumber)?.section ?? null;
   const [loading, setLoading] = useState(true);
   const [error,  setError]    = useState<string | null>(null);
   // Preferiti caricati in base alla camera corrente (vedi loadFavs).
-  const [favs,   setFavs]     = useState<Fav[]>(() => loadFavs(
-    (() => { try { return localStorage.getItem("laundryhub.room"); } catch { return null; } })()
-  ));
+  const [favs,   setFavs]     = useState<Fav[]>(() => loadFavs(readStoredRoom()));
   const t = T[lang];
 
   // Quando cambia la stanza (login/logout/cambio camera) ricarico i preferiti
@@ -657,7 +733,8 @@ export default function App() {
     try {
       const s = await api.getSnapshot();
       setWeek(s.week); setStatus(s.status); setTema(s.tema);
-      setCambioBiancheria(s.cambioBiancheria); setGrigliataAttiva(s.grigliataAttiva); setError(null);
+      setCambioBiancheria(s.cambioBiancheria); setGrigliataAttiva(s.grigliataAttiva);
+      setPairs(s.pairs); setSection(s.section); setError(null);
     } catch (e: any) {
       setError(String(e?.message ?? e));
     } finally {
@@ -693,7 +770,10 @@ export default function App() {
   // comunque sul cookie lato server: nascondere un pulsante non è
   // un'autorizzazione.
   const [adminRole, setAdminRole] = useState<AdminRole | null>(null);
-  const [adminLoginOpen, setAdminLoginOpen] = useState(false);
+  // L'accesso amministratore non e' piu' un numero da digitare al posto della
+  // camera: ha un indirizzo suo, /admin (vercel.json lo riscrive su index.html).
+  // Nessun link lo porta li' dall'app dei residenti.
+  const [adminLoginOpen, setAdminLoginOpen] = useState(() => window.location.pathname.replace(/\/+$/, "").startsWith("/admin"));
   // Chi è entrato con la password provvisoria non deve poter fare altro che
   // cambiarla, e deve trovarsela davanti SUBITO — non scoprirlo più tardi,
   // provando a fare qualcosa che il server rifiuta. Vedi il gate più sotto.
@@ -756,6 +836,16 @@ export default function App() {
       setFacility("laundry");
     }
   }, [adminRole, facility]);
+
+  // Mai su una funzionalita' che la sezione ha spento: se ci si trova (la
+  // pagina era aperta mentre la configurazione cambiava, o il valore iniziale
+  // "laundry" non vale per questa sezione) si passa alla prima struttura
+  // accesa, o alle Impostazioni se non ce n'e' nessuna.
+  useEffect(() => {
+    if (isAdminFacility(facility) || !facilityOff(facility, sezione)) return;
+    const prima = FACILITIES.find((f) => !facilityOff(f.id, sezione));
+    setFacility(prima?.id ?? "impostazioni");
+  }, [facility, sezione]);
 
   // L'uscita dalla modalità amministratore non ha più un pulsante suo: la fa
   // changeRoom(), cioè il pulsante della camera in alto. Vedi lì.
@@ -936,7 +1026,7 @@ export default function App() {
       </button>
     </CenterState>
   ) : roomNumber === null ? (
-    <LoginScreen lang={lang} onLogin={chooseRoom} onAdmin={() => setAdminLoginOpen(true)}/>
+    <LoginScreen lang={lang} config={sectionConfig} onLogin={chooseRoom}/>
   ) : (
     <>
       {screen===0 && <Dashboard   theme={theme} lang={lang} week={week} status={status} roomNumber={roomNumber} isAdmin={isAdmin} favs={favs} onToggleFav={toggleFav} onBook={handleBook} onClear={handleClear} onGoDay={vaiAlGiorno} cambioBiancheria={cambioBiancheria}/>}
@@ -972,8 +1062,7 @@ export default function App() {
     bodyContent = <GrigliataView lang={lang} roomNumber={roomNumber}/>;
   } else if (facility === "guasto") {
     bodyContent = (
-      <SegnalaGuastoSheet lang={lang} status={status} onStatus={handleStatus}
-        roomNumber={roomNumber}/>
+      <SegnalaGuastoSheet lang={lang} status={status} onStatus={handleStatus}/>
     );
   } else if (facility === "impostazioni") {
     bodyContent = (
@@ -989,6 +1078,14 @@ export default function App() {
     bodyContent = mainContent;
   }
 
+  // Coppie di macchine e sezione arrivano a chi disegna le schede senza farle
+  // passare per le props di ogni livello (vedi hooks.ts).
+  bodyContent = (
+    <PairsContext.Provider value={pairs}>
+      <SectionContext.Provider value={sezione}>{bodyContent}</SectionContext.Provider>
+    </PairsContext.Provider>
+  );
+
   // Pannello accessibilità (modale, condiviso tra mobile e desktop)
   const accessibilityModal = accessibilityOpen && (
     <AccessibilityPanel
@@ -999,14 +1096,14 @@ export default function App() {
     />
   );
 
-  // Login amministratore: si apre digitando 1935 al posto della camera.
+  // Login amministratore: si apre da /admin.
   // Chi amministra non ha una camera propria: la sua identità è DIREZIONE, e
   // con quella prenota — turni di lavanderia e sale — senza dover scegliere
   // ogni volta per conto di chi sta agendo.
   const adminLoginSheet = adminLoginOpen && (
     <Suspense fallback={null}>
       <AdminLoginSheet
-        onClose={() => setAdminLoginOpen(false)}
+        onClose={() => { setAdminLoginOpen(false); if (window.location.pathname.startsWith("/admin")) window.history.replaceState(null, "", "/"); }}
         onSession={(r, deveCambiare, camera) => {
           handleAdminSession(r, deveCambiare, camera);
           // Chi ha una camera sua entra come quella camera; chi non ce l'ha
@@ -1045,7 +1142,7 @@ export default function App() {
     </div>
   );
 
-  const reminderPromptSheet = reminderPrompt && roomNumber && (
+  const reminderPromptSheet = reminderPrompt && roomNumber && featureOn(sezione, "notifications") && (
     <WelcomeReminderPrompt lang={lang} room={roomNumber} onClose={() => setReminderPrompt(false)}/>
   );
 
@@ -1053,7 +1150,7 @@ export default function App() {
     return (
       <div className="relative h-dvh w-full flex overflow-hidden"
         style={{ fontFamily:"'DM Sans', sans-serif", background:"var(--background)" }}>
-        <TemaEffetto tema={tema} />
+        <TemaEffetto tema={featureOn(sezione, "theme") ? tema : "nessuno"} />
         {globalStyle}
         {showChrome && <InstallPrompt lang={lang}/>}
         {accessibilityModal}
@@ -1066,7 +1163,7 @@ export default function App() {
           facility={facility} onFacility={setFacility}
           adminRole={adminRole}
           onChangeRoom={changeRoom}
-          grigliataAttiva={grigliataAttiva}
+          grigliataAttiva={grigliataAttiva} section={sezione}
         />
         <main className="flex-1 h-dvh min-h-0 flex flex-col overflow-y-auto overscroll-contain">
           {/* Era max-w-6xl (1152px): su uno schermo grande restavano centinaia
@@ -1098,7 +1195,7 @@ export default function App() {
       {globalStyle}
       <div className="relative flex flex-col overflow-hidden w-full h-dvh md:h-[844px] md:max-w-[420px] md:rounded-[3rem] md:shadow-2xl md:border"
         style={{ background:"var(--background)", borderColor:"var(--border)" }}>
-        <TemaEffetto tema={tema} />
+        <TemaEffetto tema={featureOn(sezione, "theme") ? tema : "nessuno"} />
         {showChrome && <InstallPrompt lang={lang}/>}
         {accessibilityModal}
         {adminLoginSheet}
@@ -1168,7 +1265,7 @@ export default function App() {
 
         <MenuStrutture aperto={menuAperto} onClose={() => setMenuAperto(false)}
           facility={facility} onChange={setFacility} lang={lang} adminRole={adminRole} roomNumber={roomNumber}
-          grigliataAttiva={grigliataAttiva}/>
+          grigliataAttiva={grigliataAttiva} section={sezione}/>
 
         <div className="flex-1 overflow-y-auto overscroll-contain min-h-0 flex flex-col mt-2">
           {bodyContent}

@@ -5,11 +5,12 @@
 // percorso pubblico bookSpace — chiusura di un'asimmetria segnalata
 // nell'audit.
 
+import { requireSectionId } from "../../../shared/validation/section.js";
 import { ValidationError } from "../../../shared/errors/AppError.js";
 import { parseIntInRange } from "../../../shared/validation/number.js";
 import { isValidSpace, DAY_MIN, DAY_MAX, START_MIN, START_MAX, END_MIN, END_MAX } from "../domain/spaces.js";
 
-export async function adminBookAsDirezione({ space, day, start, end, type }, { commonSpacesRepository }) {
+export async function adminBookAsDirezione({ space, day, start, end, type, sectionId }, { commonSpacesRepository }) {
   const slug = String(space || "").trim();
   if (!isValidSpace(slug)) throw new ValidationError("sala non valida");
 
@@ -21,7 +22,7 @@ export async function adminBookAsDirezione({ space, day, start, end, type }, { c
   if (e === null) throw new ValidationError('campo "end" non valido');
 
   return commonSpacesRepository.bookAsDirezione({
-    space: slug, day: d, start: s, end: e,
+    sectionId: requireSectionId(sectionId), space: slug, day: d, start: s, end: e,
     type: type ? String(type) : null,
   });
 }
