@@ -1,7 +1,7 @@
-import { X, Download, Printer } from "lucide-react";
+import { X } from "lucide-react";
+import { PiedeStampa } from "../resident-shared/PiedeStampa";
 import { TIME_SLOTS, DAYS_DATE, monShort, type WeekData } from "../../modello";
 import { T, type Lang } from "../../i18n";
-import { RED, RED_FG } from "../../tema";
 
 // ─── Foglio settimanale da stampare o esportare ────────────────────────────────
 //
@@ -130,18 +130,7 @@ export function FoglioSettimana({ lang, week, onClose }: {
           </div>
         </div>
 
-        <div className="foglio-modale__piede pb-7 pt-3 flex gap-2">
-          <button onClick={scaricaCsv} disabled={righe.length === 0}
-            className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl text-sm font-semibold border"
-            style={{ borderColor:div, color:sub, background:"transparent", opacity: righe.length ? 1 : 0.5 }}>
-            <Download size={15}/> CSV
-          </button>
-          <button onClick={() => window.print()} disabled={righe.length === 0}
-            className="flex-[2] flex items-center justify-center gap-2 py-3 rounded-2xl text-sm font-semibold"
-            style={{ background:RED, color:RED_FG, opacity: righe.length ? 1 : 0.5 }}>
-            <Printer size={15}/> Stampa
-          </button>
-        </div>
+        <PiedeStampa vuoto={righe.length === 0} onCsv={scaricaCsv} bordo={div} testo={sub} />
       </div>
     </div>
   );

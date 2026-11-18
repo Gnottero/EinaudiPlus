@@ -4,7 +4,7 @@ import { Plus, Trash2, Star, History, AlertTriangle, Wind, Bed } from "lucide-re
 import { WashingMachine } from "../../icons";
 import { FavPicker } from "./FavPicker";
 import { QuickBookModal } from "./QuickBookModal";
-import { Toast } from "../../pannelli";
+import { Toast } from "../../panels/Toast";
 import * as api from "../../api";
 import {
   TIME_SLOTS, WEEKLY_QUOTA, TODAY_DOW, CUR_SLOT, DAYS_DATE, monShort, slotEndDate,

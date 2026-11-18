@@ -1,14 +1,15 @@
 import { memo, useState } from "react";
 import { Printer } from "lucide-react";
 import { useMediaQuery } from "../../hooks";
+import { useSlotActions } from "./hooks";
 import { BookModal, type BookTarget } from "./BookModal";
 import { ModifyModal, type ModifyTarget } from "./ModifyModal";
 import { SlotDetailSheet, type SlotDetailTarget } from "./SlotDetailSheet";
 import { FoglioSettimana } from "./FoglioSettimana";
 import { IntestazioneVista } from "./IntestazioneVista";
-import { Toast } from "../../pannelli";
+import { Toast } from "../../panels/Toast";
 import { TIME_SLOTS, TODAY_DOW, CUR_SLOT, PREV_SLOT, DAYS_DATE, isPastBooking, ORDINE_GIORNI, RANGO_GIORNI, ANTEPRIMA_LUNEDI, type WeekData, type StatusData } from "../../modello";
-import { T, errMsg, type Lang } from "../../i18n";
+import { T, type Lang } from "../../i18n";
 import { pianoDi, colorePiano } from "../../piani";
 import { RED, RED_FG, ORANGE, type Theme } from "../../tema";
 
@@ -25,8 +26,7 @@ export const WeekOverview = memo(function WeekOverview({ lang, week, status, roo
   const [target, setTarget]           = useState<BookTarget | null>(null);
   const [modTarget, setModTarget]     = useState<ModifyTarget | null>(null);
   const [slotDetail, setSlotDetail]   = useState<SlotDetailTarget | null>(null);
-  const [toast, setToast]             = useState<string | null>(null);
-  const [toastUndo, setToastUndo]     = useState<(() => void) | null>(null);
+  const { toast, toastUndo, confirmBooking: bookSlot, deleteBooking: clearSlot, closeToast } = useSlotActions({ lang, week, onBook, onClear });
   const [stampaAperta, setStampaAperta] = useState(false);
 
   const fg  = "var(--foreground)";
@@ -59,39 +59,24 @@ export const WeekOverview = memo(function WeekOverview({ lang, week, status, roo
   const fsSlot  = isDesktop ? "text-[11px]" : "text-[9px]";
   const fsChip  = isDesktop ? "text-[11px]" : "text-[8px]";
 
-  async function confirmBooking(room: string) {
+  function confirmBooking(room: string) {
     if (!target) return;
-    const ti = target; const d = ti.dayIdx ?? TODAY_DOW;
+    const ti = target;
     setTarget(null);
-    try {
-      if (week[d]?.[ti.slotIdx]?.[ti.machineId]) await onClear(d, ti.slotIdx, ti.machineId);
-      await onBook(d, ti.slotIdx, ti.machineId, room);
-      setToast(t.slotConfirmed);
-      setToastUndo(() => () => { onClear(d, ti.slotIdx, ti.machineId).catch((e) => setToast(errMsg(e, lang))); });
-    } catch (e) { setToast(errMsg(e, lang)); setToastUndo(null); }
+    return bookSlot(ti.dayIdx ?? TODAY_DOW, ti.slotIdx, ti.machineId, room);
   }
 
-  async function deleteBooking() {
+  function deleteBooking() {
     if (!modTarget) return;
     const mt = modTarget;
     setModTarget(null);
-    try {
-      await onClear(mt.dayIdx, mt.slotIdx, mt.machineId);
-      setToast(t.slotDeleted);
-      setToastUndo(() => () => { onBook(mt.dayIdx, mt.slotIdx, mt.machineId, mt.currentRoom).catch((e) => setToast(errMsg(e, lang))); });
-    }
-    catch (e) { setToast(errMsg(e, lang)); setToastUndo(null); }
+    return clearSlot(mt.dayIdx, mt.slotIdx, mt.machineId, mt.currentRoom);
   }
 
-  async function deleteFromDetail(dayIdx: number, slotIdx: number, mid: string) {
+  function deleteFromDetail(dayIdx: number, slotIdx: number, mid: string) {
     const room = week[dayIdx]?.[slotIdx]?.[mid];
     setSlotDetail(null);
-    try {
-      await onClear(dayIdx, slotIdx, mid);
-      setToast(t.slotDeleted);
-      setToastUndo(room ? () => () => { onBook(dayIdx, slotIdx, mid, room).catch((e) => setToast(errMsg(e, lang))); } : null);
-    }
-    catch (e) { setToast(errMsg(e, lang)); setToastUndo(null); }
+    return clearSlot(dayIdx, slotIdx, mid, room);
   }
 
   // Nessun tetto di larghezza: la griglia ha sette colonne e piu' spazio ha,
@@ -99,7 +84,7 @@ export const WeekOverview = memo(function WeekOverview({ lang, week, status, roo
   // vuoto ai lati — che era esattamente il problema.
   return (
     <div className="flex flex-col h-full w-full">
-      {toast      && <Toast msg={toast} onClose={()=>{setToast(null); setToastUndo(null);}} undo={toastUndo ? { label: t.cancel, onUndo: toastUndo } : undefined}/>}
+      {toast      && <Toast msg={toast} onClose={closeToast} undo={toastUndo ? { label: t.cancel, onUndo: toastUndo } : undefined}/>}
       {target     && <BookModal target={target} bookings={week} status={status} isDark={false} lang={lang} myRoom={sessionRoom} isAdmin={isAdmin} onConfirm={confirmBooking} onClose={()=>setTarget(null)}/>}
       {modTarget  && (
         <ModifyModal

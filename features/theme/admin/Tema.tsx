@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { call } from "../../admin-shared/adminApi";
 import { S } from "../../admin-shared/adminStyles";
+import { OpzioneRadio } from "../../admin-shared/OpzioneRadio";
 
 // ─── Tema stagionale ─────────────────────────────────────────────────────────
 //
@@ -55,25 +56,12 @@ export function Tema() {
         {TEMI.map(([id, label, desc]) => {
           const scelto = attivo === id;
           return (
-            <button key={id} onClick={() => scegli(id)} disabled={busy || attivo === null}
-              style={{
-                ...S.card, padding: 14, textAlign: "left", cursor: busy ? "default" : "pointer",
-                display: "flex", alignItems: "center", gap: 12,
-                borderColor: scelto ? "var(--primary)" : "var(--border)",
-                background: scelto ? "color-mix(in srgb, var(--primary) 8%, var(--card))" : "var(--card)",
-              }}>
-              <div style={{
-                width: 20, height: 20, borderRadius: 99, flexShrink: 0,
-                border: `2px solid ${scelto ? "var(--primary)" : "var(--border)"}`,
-                display: "flex", alignItems: "center", justifyContent: "center",
-              }}>
-                {scelto && <div style={{ width: 10, height: 10, borderRadius: 99, background: "var(--primary)" }} />}
-              </div>
+            <OpzioneRadio key={id} scelto={scelto} busy={busy} disabled={busy || attivo === null} onClick={() => scegli(id)}>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <p style={{ fontSize: 14, fontWeight: 600 }}>{label}</p>
                 <p style={{ fontSize: 12, ...S.sub }}>{desc}</p>
               </div>
-            </button>
+            </OpzioneRadio>
           );
         })}
       </div>

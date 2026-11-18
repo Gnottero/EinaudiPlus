@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { call } from "../../admin-shared/adminApi";
 import { S } from "../../admin-shared/adminStyles";
+import { OpzioneRadio } from "../../admin-shared/OpzioneRadio";
 
 // ─── Cambio biancheria del martedì ────────────────────────────────────────────
 //
@@ -264,22 +265,9 @@ export function CambioBiancheria() {
               {(["grande", "piccolo"] as Tipo[]).map((id) => {
                 const scelto = tipo === id;
                 return (
-                  <button key={id} onClick={() => setTipo(id)} disabled={busy}
-                    style={{
-                      ...S.card, padding: 14, textAlign: "left", cursor: busy ? "default" : "pointer",
-                      display: "flex", alignItems: "center", gap: 12,
-                      borderColor: scelto ? "var(--primary)" : "var(--border)",
-                      background: scelto ? "color-mix(in srgb, var(--primary) 8%, var(--card))" : "var(--card)",
-                    }}>
-                    <div style={{
-                      width: 20, height: 20, borderRadius: 99, flexShrink: 0,
-                      border: `2px solid ${scelto ? "var(--primary)" : "var(--border)"}`,
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                    }}>
-                      {scelto && <div style={{ width: 10, height: 10, borderRadius: 99, background: "var(--primary)" }} />}
-                    </div>
+                  <OpzioneRadio key={id} scelto={scelto} busy={busy} disabled={busy} onClick={() => setTipo(id)}>
                     <p style={{ fontSize: 14, fontWeight: 600, textTransform: "capitalize" }}>{id}</p>
-                  </button>
+                  </OpzioneRadio>
                 );
               })}
             </div>

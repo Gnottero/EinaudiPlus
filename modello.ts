@@ -238,7 +238,7 @@ export function isValidRoom(v: string, config: SectionConfig | null = getCachedC
  * Prima la regola era "camere 1–99 una coppia, dal 100 in su tre" e dipendeva
  * dal numero di camera — adesso e' un dato della lavanderia, configurabile.
  */
-export const DEFAULT_PAIRS = 3;
+const DEFAULT_PAIRS = 3;
 
 export function machinesFor(pairs: number): { washers: string[]; dryers: string[] } {
   const n = Math.min(3, Math.max(1, Math.trunc(pairs) || DEFAULT_PAIRS));
@@ -340,7 +340,7 @@ export const isCurrentBooking = (b: MyBooking) => b.day === TODAY_DOW && b.slot 
 export const favsKey = (room: string | null) => `laundryhub.favs.${room ?? "_"}`;
 
 /** La sezione che esisteva prima delle sezioni: le camere senza lettera erano sue. */
-export const LEGACY_SECTION_CODE = "V";
+const LEGACY_SECTION_CODE = "V";
 
 /**
  * Migra i preferiti salvati con la camera SENZA lettera ("112") sotto la
@@ -354,7 +354,7 @@ export const LEGACY_SECTION_CODE = "V";
  * - Il localStorage puo' lanciare (modalita' privata): tutto in try/catch.
  * Torna true se ha migrato qualcosa.
  */
-export function migrateLegacyFavs(room: string | null, storage: Pick<Storage, "getItem" | "setItem" | "removeItem"> = localStorage): boolean {
+function migrateLegacyFavs(room: string | null, storage: Pick<Storage, "getItem" | "setItem" | "removeItem"> = localStorage): boolean {
   const m = /^([A-Za-z]{1,2})(\d{1,4})/.exec(String(room ?? "").trim());
   if (!m || m[1].toUpperCase() !== LEGACY_SECTION_CODE) return false;
   const nuova = favsKey(String(room).trim());

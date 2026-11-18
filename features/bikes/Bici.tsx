@@ -6,8 +6,9 @@
 // vedersi la bici che arriva pedalando quando la dichiarazione scatta a "sì".
 
 import { useState, useEffect, useCallback } from "react";
-import { Bike, Loader2, AlertTriangle, Check } from "lucide-react";
+import { Bike, Check } from "lucide-react";
 import * as api from "../../api";
+import { StatoSoloCamere, StatoCaricamento, StatoErrore } from "../resident-shared/StatoSezione";
 import { T as T_APP, isFeatureOffError, type Lang } from "../../i18n";
 
 const RED = "var(--primary)", RED_FG = "var(--primary-foreground)";
@@ -263,34 +264,12 @@ export default function BiciView({ lang, roomNumber }: { lang: Lang; roomNumber:
     finally { setBusy(false); }
   }
 
-  if (!camera) {
-    return (
-      <div className="flex-1 flex flex-col items-center justify-center gap-4 px-8 text-center">
-        <BiciSvg attiva={false} />
-        <p className="text-sm" style={{ color: sub }}>{t.soloCamere}</p>
-      </div>
-    );
-  }
+  if (!camera) return <StatoSoloCamere icona={<BiciSvg attiva={false} />} testo={t.soloCamere} colore={sub} />;
 
-  if (loading) {
-    return (
-      <div className="flex-1 flex flex-col items-center justify-center gap-3" style={{ color: sub }}>
-        <Loader2 size={26} className="animate-spin-slow" style={{ color: RED }} />
-        <p className="text-sm">{t.loading}</p>
-      </div>
-    );
-  }
+  if (loading) return <StatoCaricamento testo={t.loading} colore={sub} />;
 
   if (error) {
-    return (
-      <div className="flex-1 flex flex-col items-center justify-center gap-3 px-8 text-center" style={{ color: sub }}>
-        <AlertTriangle size={26} style={{ color: "var(--destructive)" }} />
-        <p className="text-sm">{spenta ? T_APP[lang].funzioneNonAttiva : t.netError}</p>
-        <button onClick={load} className="rounded-xl px-4 py-2 text-sm font-semibold" style={{ background: RED, color: RED_FG }}>
-          {t.retry}
-        </button>
-      </div>
-    );
+    return <StatoErrore testo={spenta ? T_APP[lang].funzioneNonAttiva : t.netError} retry={t.retry} onRetry={load} colore={sub} />;
   }
 
   const attiva = !!haBici;

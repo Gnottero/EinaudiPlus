@@ -1,13 +1,14 @@
 import { memo, useState } from "react";
 import { usePairs } from "../../hooks";
+import { useSlotActions } from "./hooks";
 import { Star, Plus } from "lucide-react";
 import { WashingMachine } from "../../icons";
 import { BookModal, type BookTarget } from "./BookModal";
 import { ModifyModal, type ModifyTarget } from "./ModifyModal";
 import { IntestazioneVista } from "./IntestazioneVista";
-import { Toast } from "../../pannelli";
+import { Toast } from "../../panels/Toast";
 import { TIME_SLOTS, TODAY_DOW, CUR_SLOT, PREV_SLOT, DAYS_DATE, machinesFor, ORDINE_GIORNI, RANGO_GIORNI, ANTEPRIMA_LUNEDI, type WeekData, type StatusData, type Fav } from "../../modello";
-import { T, errMsg, type Lang } from "../../i18n";
+import { T, type Lang } from "../../i18n";
 import { pianoDi, colorePiano } from "../../piani";
 import { RED, RED_FG, ORANGE, ORANGE_T, type Theme } from "../../tema";
 
@@ -26,8 +27,7 @@ export const DaySchedule = memo(function DaySchedule({ lang, week, status, roomN
   const [selDay, setSelDay]       = useState(TODAY_DOW);
   const [target, setTarget]       = useState<BookTarget | null>(null);
   const [modTarget, setModTarget] = useState<ModifyTarget | null>(null);
-  const [toast, setToast]         = useState<string | null>(null);
-  const [toastUndo, setToastUndo] = useState<(() => void) | null>(null);
+  const { toast, toastUndo, confirmBooking: bookSlot, deleteBooking: clearSlot, closeToast } = useSlotActions({ lang, week, onBook, onClear });
 
   const sub = "var(--gray-accessible-text)";
   const hdr = "var(--muted)";
@@ -36,28 +36,18 @@ export const DaySchedule = memo(function DaySchedule({ lang, week, status, roomN
 
   const washIds = machinesFor(pairs).washers;
 
-  async function confirmBooking(room: string) {
+  function confirmBooking(room: string) {
     if (!target) return;
     const ti = target;
     setTarget(null);
-    try {
-      if (week[selDay]?.[ti.slotIdx]?.[ti.machineId]) await onClear(selDay, ti.slotIdx, ti.machineId);
-      await onBook(selDay, ti.slotIdx, ti.machineId, room);
-      setToast(t.slotConfirmed);
-      setToastUndo(() => () => { onClear(selDay, ti.slotIdx, ti.machineId).catch((e) => setToast(errMsg(e, lang))); });
-    } catch (e) { setToast(errMsg(e, lang)); setToastUndo(null); }
+    return bookSlot(selDay, ti.slotIdx, ti.machineId, room);
   }
 
-  async function deleteBooking() {
+  function deleteBooking() {
     if (!modTarget) return;
     const mt = modTarget;
     setModTarget(null);
-    try {
-      await onClear(mt.dayIdx, mt.slotIdx, mt.machineId);
-      setToast(t.slotDeleted);
-      setToastUndo(() => () => { onBook(mt.dayIdx, mt.slotIdx, mt.machineId, mt.currentRoom).catch((e) => setToast(errMsg(e, lang))); });
-    }
-    catch (e) { setToast(errMsg(e, lang)); setToastUndo(null); }
+    return clearSlot(mt.dayIdx, mt.slotIdx, mt.machineId, mt.currentRoom);
   }
 
   // Nessun tetto di larghezza, come la Settimana (vedi WeekView.tsx): un
@@ -68,7 +58,7 @@ export const DaySchedule = memo(function DaySchedule({ lang, week, status, roomN
   // stretto.
   return (
     <div className="flex flex-col h-full w-full">
-      {toast     && <Toast msg={toast} onClose={()=>{setToast(null); setToastUndo(null);}} undo={toastUndo ? { label: t.cancel, onUndo: toastUndo } : undefined}/>}
+      {toast     && <Toast msg={toast} onClose={closeToast} undo={toastUndo ? { label: t.cancel, onUndo: toastUndo } : undefined}/>}
       {target    && <BookModal target={{...target,dayIdx:selDay}} bookings={week} status={status} isDark={false} lang={lang} myRoom={sessionRoom} isAdmin={isAdmin} onConfirm={confirmBooking} onClose={()=>setTarget(null)}/>}
       {modTarget && (
         <ModifyModal

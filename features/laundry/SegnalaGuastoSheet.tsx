@@ -2,7 +2,7 @@ import { useState } from "react";
 import { usePairs } from "../../hooks";
 import { Wind, Send, AlertTriangle, Wrench } from "lucide-react";
 import { WashingMachine } from "../../icons";
-import { Toast } from "../../pannelli";
+import { Toast } from "../../panels/Toast";
 import { machinesFor, type Machine, type MachineType, type StatusData } from "../../modello";
 import { T, errMsg, type Lang } from "../../i18n";
 import { RED, RED_FG, OOS_C, OOS_T, GREEN, GREEN_T, type Theme } from "../../tema";

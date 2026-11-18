@@ -29,10 +29,10 @@ export { FEATURES, SHAREABLE, isFeature, isShareable, isFeatureEnabled } from ".
 export { scopeDecision, filterByScope, REGOLE } from "./domain/scope.js";
 export { sampleRoomForLaundry, resourceSection, findSectionById, sectionIdOfRange, resolveRoom, sectionIdsOfLaundry, sectionIdOfCode, findSectionByCode } from "./domain/config.js";
 
-export const CONFIG_TTL_MS = 30_000;
+const CONFIG_TTL_MS = 30_000;
 let cache = { at: 0, value: null };
 
-export function invalidateConfig() { cache = { at: 0, value: null }; }
+function invalidateConfig() { cache = { at: 0, value: null }; }
 
 /** La configurazione, dalla cache se ancora fresca. */
 export async function getConfig({ fresh = false } = {}) {

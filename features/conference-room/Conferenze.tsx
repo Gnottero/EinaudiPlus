@@ -11,8 +11,9 @@
 // trova anche il modulo per aggiungere o togliere un evento — `GiornoSheetAdmin`
 // è importato in lazy dal pannello admin: chi non ha una sessione (la
 // stragrande maggioranza di chi apre questa pagina) non lo scarica.
+import { PiedeStampa } from "../resident-shared/PiedeStampa";
 import { useState, useEffect, useCallback, lazy, Suspense } from "react";
-import { Loader2, AlertTriangle, ChevronLeft, ChevronRight, X, Printer, Download } from "lucide-react";
+import { Loader2, AlertTriangle, ChevronLeft, ChevronRight, X, Printer } from "lucide-react";
 import * as conferenze from "../../conferenzeApi";
 import type { Occorrenza, Agenda } from "../../conferenzeApi";
 import { T, isFeatureOffError, type Lang } from "../../i18n";
@@ -394,18 +395,7 @@ function FoglioStampa({ occorrenze, lang, onClose }: {
           )}
         </div>
 
-        <div className="foglio-modale__piede pb-7 pt-3 flex gap-2">
-          <button onClick={scaricaCsv} disabled={righe.length === 0}
-            className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl text-sm font-semibold border"
-            style={{ borderColor: DIV, color: SUB, background: "transparent", opacity: righe.length ? 1 : 0.5 }}>
-            <Download size={15} /> CSV
-          </button>
-          <button onClick={() => window.print()} disabled={righe.length === 0}
-            className="flex-[2] flex items-center justify-center gap-2 py-3 rounded-2xl text-sm font-semibold"
-            style={{ background: RED, color: "var(--primary-foreground)", opacity: righe.length ? 1 : 0.5 }}>
-            <Printer size={15} /> Stampa
-          </button>
-        </div>
+        <PiedeStampa vuoto={righe.length === 0} onCsv={scaricaCsv} bordo={DIV} testo={SUB} />
       </div>
     </div>
   );

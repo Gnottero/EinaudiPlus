@@ -20,7 +20,7 @@ export type FeatureKey =
 /** Le risorse che una sezione puo' CONDIVIDERE con un'altra (section.shared_with). */
 export type SharedKey = "cinema" | "music" | "conference" | "linen" | "grigliata" | "theme";
 
-export interface SectionRange {
+interface SectionRange {
   id?: number; label: string; from: number; to: number; laundry_id: number | null;
   /** Colore del gruppo di camere (#rrggbb), scelto dall'amministratore della sezione. */
   color?: string | null;

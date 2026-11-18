@@ -2,7 +2,7 @@
 // menu, e dichiara di aver pagato la quota.
 //
 // Compare in navigazione SOLO quando una grigliata è attiva (vedi
-// App.tsx, facilitiesFor/grigliataAttiva) — se non c'è nessuna grigliata la
+// shell/navigazione.ts, facilitiesFor/grigliataAttiva) — se non c'è nessuna grigliata la
 // scheda sparisce del tutto, non resta lì vuota. Il lato del delegato (fa
 // partire l'evento, vede chi ha aderito, conferma i pagamenti) vive in
 // features/grigliata/admin/GrigliataAdmin.tsx.
@@ -10,11 +10,15 @@
 // Stesso modello di fiducia di Bici.tsx: la camera è autodichiarata, non
 // verificata — chi dice di essere la 214 aderisce per la 214.
 
-import { useState, useEffect, useCallback, useRef } from "react";
-import { Flame, Loader2, AlertTriangle, Check, ExternalLink, Ticket, ChevronsRight, Lock } from "lucide-react";
+import { useState, useEffect, useCallback } from "react";
+import { Flame, Check, ExternalLink, Ticket } from "lucide-react";
 import * as api from "../../api";
+import { StatoSoloCamere, StatoCaricamento, StatoErrore } from "../resident-shared/StatoSezione";
 import { T as T_APP, isFeatureOffError, type Lang } from "../../i18n";
 import { EMOJI_TICKET_DEFAULT } from "./emojiTicket";
+import { T } from "./testi";
+import { TicketCard } from "./TicketCard";
+import { oggiISO, fmtGiornoLocale } from "./date";
 import { useAvvisiInTempoReale } from "../../realtime";
 
 const RED = "var(--primary)", RED_FG = "var(--primary-foreground)";
@@ -22,243 +26,6 @@ const GREEN = "#22c55e";
 const fg = "var(--foreground)", sub = "var(--muted-foreground)";
 const surf = "var(--card)", div = "var(--border)";
 
-const T = {
-  it: {
-    titolo: "Grigliata",
-    loading: "Carico…",
-    retry: "Riprova",
-    netError: "Impossibile contattare il server.",
-    soloCamere: "Questa sezione è per le camere: la Direzione non partecipa.",
-    nessunaAttiva: "Non c'è nessuna grigliata attiva al momento.",
-    scadeIl: (d: string) => `Le adesioni chiudono il ${d}`,
-    scadeIlChiuse: (d: string) => `Le adesioni sono chiuse dal ${d}`,
-    adesioniChiuse: "Le adesioni sono chiuse: non si può più aderire né cambiare scelta.",
-    siMangiaIl: (d: string) => `Si mangia il ${d}`,
-    menuLabel: "Quale menu desideri?",
-    infoTitolo: "Informazioni su di te",
-    infoDesc: "Così chi cucina può preparare qualcosa anche per te.",
-    dietaLabel: "Segui una dieta particolare?",
-    dietaClassico: "Mangio di tutto",
-    dietaVegetariano: "Vegetariano",
-    dietaVegano: "Vegano",
-    senzaGlutine: "Senza glutine",
-    senzaGlutineHint: "Celiachia o intolleranza al glutine",
-    noteLabel: "Note (facoltative)",
-    notePlaceholder: "Allergie, intolleranze o altro che chi cucina deve sapere",
-    note: "Note",
-    partecipaBtn: "Partecipo",
-    cambiaScelta: "Modifica",
-    partecipi: "Partecipi!",
-    menuScelto: (m: string) => `Menu: ${m}`,
-    pagamentoTitolo: "Invia la tua quota",
-    quota: (q: string) => `Quota a persona: ${q}`,
-    pagamentiDisattivati: "Per ora i pagamenti sono disattivati: non devi inviare niente dall'app. Il delegato ti farà sapere se e come pagare.",
-    pagamentoDesc: "Usa uno dei link qui sotto per inviare la quota al delegato, poi tocca \"Ho pagato\".",
-    causalePagamento: "Importante: scrivi il numero della tua camera nella causale (nota) del pagamento, così il delegato può abbinarlo a te.",
-    paypalBtn: "Paga con PayPal",
-    satispayBtn: "Paga con Satispay",
-    dichiaraPagamento: "Ho pagato",
-    inAttesaConferma: "In attesa di conferma dal delegato",
-    pagamentoConfermato: "Pagamento confermato",
-    erroreAzione: "Non è riuscito, riprova.",
-    ticketTitolo: "I tuoi ticket",
-    ticketScorriUsa: "Scorri per usare",
-    ticketUsaHint: "Scorri solo davanti a chi ti serve: il numero compare in quel momento, non prima.",
-    ticketUsato: (n: number) => `Usato · n. ${n}`,
-    ticketBloccato: (d: string) => `Si sbloccano il ${d}`,
-    ticketUsatoAlle: "Usato alle",
-    ticketUsatoChiudi: "Fatto",
-    ticketNumero: "Numero",
-  },
-  en: {
-    titolo: "Barbecue",
-    loading: "Loading…",
-    retry: "Retry",
-    netError: "Couldn't reach the server.",
-    soloCamere: "This section is for rooms: the front desk doesn't take part.",
-    nessunaAttiva: "There's no barbecue running right now.",
-    scadeIl: (d: string) => `Sign-ups close on ${d}`,
-    scadeIlChiuse: (d: string) => `Sign-ups closed on ${d}`,
-    adesioniChiuse: "Sign-ups are closed: you can no longer join or change your choice.",
-    siMangiaIl: (d: string) => `It's happening on ${d}`,
-    menuLabel: "Which menu would you like?",
-    infoTitolo: "About you",
-    infoDesc: "So the cooks can prepare something for you too.",
-    dietaLabel: "Any dietary preference?",
-    dietaClassico: "I eat everything",
-    dietaVegetariano: "Vegetarian",
-    dietaVegano: "Vegan",
-    senzaGlutine: "Gluten-free",
-    senzaGlutineHint: "Coeliac disease or gluten intolerance",
-    noteLabel: "Notes (optional)",
-    notePlaceholder: "Allergies, intolerances or anything the cooks should know",
-    note: "Notes",
-    partecipaBtn: "I'm in",
-    cambiaScelta: "Edit",
-    partecipi: "You're in!",
-    menuScelto: (m: string) => `Menu: ${m}`,
-    pagamentoTitolo: "Send your share",
-    quota: (q: string) => `Share per person: ${q}`,
-    pagamentiDisattivati: "Payments are turned off for now: you don't need to send anything through the app. The organizer will let you know if and how to pay.",
-    pagamentoDesc: "Use one of the links below to send your share to the organizer, then tap \"I've paid\".",
-    causalePagamento: "Important: put your room number in the payment note, so the organizer can match it to you.",
-    paypalBtn: "Pay with PayPal",
-    satispayBtn: "Pay with Satispay",
-    dichiaraPagamento: "I've paid",
-    inAttesaConferma: "Waiting for the organizer to confirm",
-    pagamentoConfermato: "Payment confirmed",
-    erroreAzione: "That didn't work, try again.",
-    ticketTitolo: "Your tickets",
-    ticketScorriUsa: "Slide to use",
-    ticketUsaHint: "Only slide in front of whoever's serving: the number appears at that moment, not before.",
-    ticketUsato: (n: number) => `Used · #${n}`,
-    ticketBloccato: (d: string) => `Unlocks on ${d}`,
-    ticketUsatoAlle: "Used at",
-    ticketUsatoChiudi: "Done",
-    ticketNumero: "Number",
-  },
-  fr: {
-    titolo: "Barbecue",
-    loading: "Chargement…",
-    retry: "Réessayer",
-    netError: "Impossible de joindre le serveur.",
-    soloCamere: "Cette section est pour les chambres : la Direction n'y participe pas.",
-    nessunaAttiva: "Il n'y a aucun barbecue en cours.",
-    scadeIl: (d: string) => `Les inscriptions ferment le ${d}`,
-    scadeIlChiuse: (d: string) => `Inscriptions fermées depuis le ${d}`,
-    adesioniChiuse: "Les inscriptions sont fermées : tu ne peux plus t'inscrire ni modifier ton choix.",
-    siMangiaIl: (d: string) => `Ça se passe le ${d}`,
-    menuLabel: "Quel menu souhaites-tu ?",
-    infoTitolo: "À propos de toi",
-    infoDesc: "Pour que les cuisiniers puissent prévoir quelque chose pour toi aussi.",
-    dietaLabel: "Un régime particulier ?",
-    dietaClassico: "Je mange de tout",
-    dietaVegetariano: "Végétarien",
-    dietaVegano: "Végétalien",
-    senzaGlutine: "Sans gluten",
-    senzaGlutineHint: "Maladie cœliaque ou intolérance au gluten",
-    noteLabel: "Remarques (facultatif)",
-    notePlaceholder: "Allergies, intolérances ou autre chose que les cuisiniers doivent savoir",
-    note: "Remarques",
-    partecipaBtn: "Je participe",
-    cambiaScelta: "Modifier",
-    partecipi: "Tu es inscrit·e !",
-    menuScelto: (m: string) => `Menu : ${m}`,
-    pagamentoTitolo: "Envoie ta part",
-    quota: (q: string) => `Part par personne : ${q}`,
-    pagamentiDisattivati: "Les paiements sont désactivés pour le moment : tu n'as rien à envoyer depuis l'app. L'organisateur te dira si et comment payer.",
-    pagamentoDesc: "Utilise un des liens ci-dessous pour envoyer ta part à l'organisateur, puis touche \"J'ai payé\".",
-    causalePagamento: "Important : indique le numéro de ta chambre dans la note du paiement, pour que l'organisateur puisse te retrouver.",
-    paypalBtn: "Payer avec PayPal",
-    satispayBtn: "Payer avec Satispay",
-    dichiaraPagamento: "J'ai payé",
-    inAttesaConferma: "En attente de confirmation de l'organisateur",
-    pagamentoConfermato: "Paiement confirmé",
-    erroreAzione: "Ça n'a pas marché, réessaie.",
-    ticketTitolo: "Tes tickets",
-    ticketScorriUsa: "Glisse pour utiliser",
-    ticketUsaHint: "Glisse seulement devant la personne qui te sert : le numéro apparaît à ce moment-là, pas avant.",
-    ticketUsato: (n: number) => `Utilisé · n° ${n}`,
-    ticketBloccato: (d: string) => `Se débloquent le ${d}`,
-    ticketUsatoAlle: "Utilisé à",
-    ticketUsatoChiudi: "Terminé",
-    ticketNumero: "Numéro",
-  },
-  de: {
-    titolo: "Grillfest",
-    loading: "Wird geladen…",
-    retry: "Nochmal versuchen",
-    netError: "Server nicht erreichbar.",
-    soloCamere: "Dieser Bereich ist für Zimmer: die Verwaltung nimmt nicht teil.",
-    nessunaAttiva: "Gerade läuft kein Grillfest.",
-    scadeIl: (d: string) => `Anmeldeschluss ist der ${d}`,
-    scadeIlChiuse: (d: string) => `Anmeldeschluss war der ${d}`,
-    adesioniChiuse: "Die Anmeldung ist geschlossen: du kannst dich nicht mehr anmelden oder deine Wahl ändern.",
-    siMangiaIl: (d: string) => `Gefeiert wird am ${d}`,
-    menuLabel: "Welches Menü möchtest du?",
-    infoTitolo: "Über dich",
-    infoDesc: "Damit die Köche auch für dich etwas vorbereiten können.",
-    dietaLabel: "Ernährst du dich besonders?",
-    dietaClassico: "Ich esse alles",
-    dietaVegetariano: "Vegetarisch",
-    dietaVegano: "Vegan",
-    senzaGlutine: "Glutenfrei",
-    senzaGlutineHint: "Zöliakie oder Glutenunverträglichkeit",
-    noteLabel: "Hinweise (optional)",
-    notePlaceholder: "Allergien, Unverträglichkeiten oder was die Köche sonst wissen sollten",
-    note: "Hinweise",
-    partecipaBtn: "Ich mache mit",
-    cambiaScelta: "Ändern",
-    partecipi: "Du bist dabei!",
-    menuScelto: (m: string) => `Menü: ${m}`,
-    pagamentoTitolo: "Sende deinen Anteil",
-    quota: (q: string) => `Anteil pro Person: ${q}`,
-    pagamentiDisattivati: "Zahlungen sind vorerst deaktiviert: du musst über die App nichts senden. Der Organisator sagt dir, ob und wie du zahlst.",
-    pagamentoDesc: "Nutze einen der Links unten, um deinen Anteil an den Organisator zu senden, und tippe dann auf \"Bezahlt\".",
-    causalePagamento: "Wichtig: Gib deine Zimmernummer in der Zahlungsnotiz an, damit der Organisator sie dir zuordnen kann.",
-    paypalBtn: "Mit PayPal bezahlen",
-    satispayBtn: "Mit Satispay bezahlen",
-    dichiaraPagamento: "Bezahlt",
-    inAttesaConferma: "Wartet auf Bestätigung durch den Organisator",
-    pagamentoConfermato: "Zahlung bestätigt",
-    erroreAzione: "Hat nicht geklappt, versuch's nochmal.",
-    ticketTitolo: "Deine Tickets",
-    ticketScorriUsa: "Zum Einlösen wischen",
-    ticketUsaHint: "Nur vor der servierenden Person wischen: die Nummer erscheint erst in diesem Moment.",
-    ticketUsato: (n: number) => `Eingelöst · Nr. ${n}`,
-    ticketBloccato: (d: string) => `Freigeschaltet am ${d}`,
-    ticketUsatoAlle: "Eingelöst um",
-    ticketUsatoChiudi: "Fertig",
-    ticketNumero: "Nummer",
-  },
-  es: {
-    titolo: "Barbacoa",
-    loading: "Cargando…",
-    retry: "Reintentar",
-    netError: "No se puede contactar con el servidor.",
-    soloCamere: "Esta sección es para las habitaciones: la Dirección no participa.",
-    nessunaAttiva: "No hay ninguna barbacoa activa ahora mismo.",
-    scadeIl: (d: string) => `Las inscripciones cierran el ${d}`,
-    scadeIlChiuse: (d: string) => `Inscripciones cerradas desde el ${d}`,
-    adesioniChiuse: "Las inscripciones están cerradas: ya no puedes apuntarte ni cambiar tu elección.",
-    siMangiaIl: (d: string) => `Se celebra el ${d}`,
-    menuLabel: "¿Qué menú quieres?",
-    infoTitolo: "Sobre ti",
-    infoDesc: "Así quienes cocinan pueden preparar algo también para ti.",
-    dietaLabel: "¿Sigues alguna dieta?",
-    dietaClassico: "Como de todo",
-    dietaVegetariano: "Vegetariano",
-    dietaVegano: "Vegano",
-    senzaGlutine: "Sin gluten",
-    senzaGlutineHint: "Celiaquía o intolerancia al gluten",
-    noteLabel: "Notas (opcionales)",
-    notePlaceholder: "Alergias, intolerancias u otra cosa que deban saber quienes cocinan",
-    note: "Notas",
-    partecipaBtn: "Participo",
-    cambiaScelta: "Modificar",
-    partecipi: "¡Estás dentro!",
-    menuScelto: (m: string) => `Menú: ${m}`,
-    pagamentoTitolo: "Envía tu parte",
-    quota: (q: string) => `Cuota por persona: ${q}`,
-    pagamentiDisattivati: "Por ahora los pagos están desactivados: no tienes que enviar nada desde la app. El organizador te dirá si hay que pagar y cómo.",
-    pagamentoDesc: "Usa uno de los enlaces de abajo para enviar tu parte al organizador, luego toca \"Ya he pagado\".",
-    causalePagamento: "Importante: escribe el número de tu habitación en la nota del pago, para que el organizador pueda identificarte.",
-    paypalBtn: "Pagar con PayPal",
-    satispayBtn: "Pagar con Satispay",
-    dichiaraPagamento: "Ya he pagado",
-    inAttesaConferma: "Esperando confirmación del organizador",
-    pagamentoConfermato: "Pago confirmado",
-    erroreAzione: "No ha funcionado, inténtalo de nuevo.",
-    ticketTitolo: "Tus tickets",
-    ticketScorriUsa: "Desliza para usar",
-    ticketUsaHint: "Desliza solo delante de quien te sirve: el número aparece en ese momento, no antes.",
-    ticketUsato: (n: number) => `Usado · n.º ${n}`,
-    ticketBloccato: (d: string) => `Se desbloquean el ${d}`,
-    ticketUsatoAlle: "Usado a las",
-    ticketUsatoChiudi: "Listo",
-    ticketNumero: "Número",
-  },
-} as const;
 
 /**
  * Un link "paypal.me/mario", senza schema, è un URL RELATIVO per un
@@ -273,168 +40,8 @@ function href(link: string): string {
   return /^https?:\/\//i.test(link) ? link : `https://${link}`;
 }
 
-/** "20 settembre" da un `date` puro ("AAAA-MM-GG", senza orario) — split sui
- *  componenti invece di passare per `new Date(iso)`: letto come UTC e
- *  riformattato in fuso locale potrebbe slittare di un giorno. */
 const LOCALE: Record<Lang, string> = { it: "it-IT", en: "en-GB", fr: "fr-FR", de: "de-DE", es: "es-ES" };
-
-function fmtGiorno(dataIso: string, lang: Lang): string {
-  const [y, m, d] = dataIso.split("-").map(Number);
-  if (!y || !m || !d) return dataIso;
-  return new Date(y, m - 1, d).toLocaleDateString(LOCALE[lang], { day: "numeric", month: "long" });
-}
-
-/** "AAAA-MM-GG" di oggi, nel fuso del dispositivo — stesso formato del
- *  `date` che il server salva, per un confronto diretto senza passare da
- *  `Date` (che introdurrebbe un fuso orario nel confronto). */
-function oggiISO(): string {
-  const d = new Date();
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-}
-
-// ─── Ticket ─────────────────────────────────────────────────────────────────
-//
-// Uno slider "scorri per usare" invece di un bottone: un ticket si spende
-// con un gesto deliberato, da sinistra a destra fino in fondo — un tocco
-// distratto mentre si scorre la pagina non lo brucia. Lasciato prima
-// dell'85% della corsa torna indietro da solo.
-
-const KNOB = 48, PAD = 4, SOGLIA = 0.85;
-
-function SlideToUse({ label, disabled, onComplete }: {
-  label: string; disabled: boolean; onComplete: () => Promise<boolean>;
-}) {
-  const trackRef = useRef<HTMLDivElement>(null);
-  const start = useRef<{ px: number; x: number } | null>(null);
-  const xRef = useRef(0);
-  const [x, setXState] = useState(0);
-  const [trascina, setTrascina] = useState(false);
-  const [inCorso, setInCorso] = useState(false);
-
-  const setX = (v: number) => { xRef.current = v; setXState(v); };
-  const corsa = () => Math.max(1, (trackRef.current?.clientWidth ?? 0) - KNOB - PAD * 2);
-  const bloccato = disabled || inCorso;
-
-  async function completa() {
-    setX(corsa());
-    setInCorso(true);
-    const ok = await onComplete();
-    setInCorso(false);
-    // Riuscito: il ticket diventa "usato" e questo slider sparisce col
-    // prossimo load(). Fallito: torna all'inizio, si può riprovare.
-    if (!ok) setX(0);
-  }
-
-  function giu(e: React.PointerEvent<HTMLDivElement>) {
-    if (bloccato) return;
-    e.currentTarget.setPointerCapture(e.pointerId);
-    start.current = { px: e.clientX, x: xRef.current };
-    setTrascina(true);
-  }
-  function muovi(e: React.PointerEvent<HTMLDivElement>) {
-    if (!start.current) return;
-    setX(Math.min(corsa(), Math.max(0, start.current.x + e.clientX - start.current.px)));
-  }
-  function su() {
-    if (!start.current) return;
-    start.current = null;
-    setTrascina(false);
-    if (xRef.current >= corsa() * SOGLIA) completa();
-    else setX(0);
-  }
-
-  const progresso = Math.min(1, x / corsa());
-
-  return (
-    <div ref={trackRef} className="relative w-full rounded-full overflow-hidden select-none"
-      style={{
-        height: KNOB + PAD * 2,
-        background: `color-mix(in srgb, ${RED} 12%, var(--secondary))`,
-        opacity: disabled ? 0.55 : 1,
-      }}>
-      {/* La scia dietro la manopola: si riempie mentre si trascina. */}
-      <div className="absolute inset-y-0 left-0 rounded-full"
-        style={{
-          width: x + KNOB + PAD * 2,
-          background: `color-mix(in srgb, ${RED} 30%, transparent)`,
-          transition: trascina ? "none" : "width .25s ease",
-        }} />
-      <p className="absolute inset-0 flex items-center justify-center text-sm font-semibold pointer-events-none"
-        style={{ color: fg, opacity: 1 - progresso * 1.4, paddingLeft: KNOB }}>
-        {inCorso ? <Loader2 size={18} className="animate-spin-slow" /> : label}
-      </p>
-      <div role="button" tabIndex={bloccato ? -1 : 0} aria-label={label} aria-disabled={bloccato}
-        onPointerDown={giu} onPointerMove={muovi} onPointerUp={su} onPointerCancel={su}
-        onKeyDown={(e) => { if (!bloccato && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); completa(); } }}
-        className="absolute rounded-full flex items-center justify-center"
-        style={{
-          top: PAD, left: PAD, width: KNOB, height: KNOB,
-          transform: `translateX(${x}px)`,
-          transition: trascina ? "none" : "transform .25s ease",
-          background: RED, color: RED_FG,
-          boxShadow: "0 2px 8px rgba(0,0,0,.25)",
-          touchAction: "none", cursor: bloccato ? "default" : "grab",
-        }}>
-        {disabled ? <Lock size={18} /> : <ChevronsRight size={22} />}
-      </div>
-    </div>
-  );
-}
-
-/** Una carta-ticket: emoji e nome sopra, una linea tratteggiata con le due
- *  tacche laterali come un biglietto vero, sotto lo slider (o lo stato
- *  "usato" col suo numero). */
-function TicketCard({ tk, t, bloccatoFino, onUsa }: {
-  tk: api.GrigliataTicket;
-  t: (typeof T)[Lang];
-  bloccatoFino: string | null;
-  onUsa: () => Promise<boolean>;
-}) {
-  const tacca = (lato: "left" | "right") => (
-    <span className="absolute rounded-full"
-      style={{ width: 18, height: 18, top: -9, [lato]: -9, background: "var(--background)", border: `1px solid ${div}` }} />
-  );
-  return (
-    <div className="rounded-2xl border overflow-hidden"
-      style={{
-        background: tk.usato ? `color-mix(in srgb, ${GREEN} 8%, ${surf})` : surf,
-        borderColor: tk.usato ? `color-mix(in srgb, ${GREEN} 35%, ${div})` : div,
-      }}>
-      <div className="flex items-center gap-3 px-4 py-3.5">
-        <div className="shrink-0 flex items-center justify-center rounded-2xl"
-          style={{
-            width: 52, height: 52, fontSize: 30, lineHeight: 1,
-            background: tk.usato ? `color-mix(in srgb, ${GREEN} 15%, transparent)` : `color-mix(in srgb, ${RED} 12%, transparent)`,
-            filter: tk.usato ? "grayscale(0.6)" : "none",
-          }}>
-          {tk.emoji || EMOJI_TICKET_DEFAULT}
-        </div>
-        <div className="min-w-0 flex-1">
-          <p className="text-base font-bold leading-tight" style={{ color: fg, overflowWrap: "anywhere" }}>{tk.nome}</p>
-          {tk.usato && (
-            <p className="text-xs font-semibold mt-0.5 flex items-center gap-1" style={{ color: GREEN }}>
-              <Check size={13} />{t.ticketUsato(tk.numero ?? 0)}
-            </p>
-          )}
-        </div>
-        {tk.usato && tk.numero != null && (
-          <span className="shrink-0 text-2xl font-extrabold tabular-nums" style={{ color: GREEN }}>#{tk.numero}</span>
-        )}
-      </div>
-
-      {!tk.usato && (
-        <div className="relative px-4 pt-3.5 pb-4" style={{ borderTop: `2px dashed ${div}` }}>
-          {tacca("left")}{tacca("right")}
-          <SlideToUse
-            label={bloccatoFino ? t.ticketBloccato(bloccatoFino) : t.ticketScorriUsa}
-            disabled={bloccatoFino != null}
-            onComplete={onUsa} />
-        </div>
-      )}
-    </div>
-  );
-}
+const fmtGiorno = (dataIso: string, lang: Lang): string => fmtGiornoLocale(dataIso, LOCALE[lang]);
 
 export default function GrigliataView({ lang, roomNumber }: { lang: Lang; roomNumber: string | null }) {
   const t = T[lang];
@@ -577,34 +184,12 @@ export default function GrigliataView({ lang, roomNumber }: { lang: Lang; roomNu
     }
   }
 
-  if (!camera) {
-    return (
-      <div className="flex-1 flex flex-col items-center justify-center gap-4 px-8 text-center">
-        <Flame size={40} style={{ color: sub }} />
-        <p className="text-sm" style={{ color: sub }}>{t.soloCamere}</p>
-      </div>
-    );
-  }
+  if (!camera) return <StatoSoloCamere icona={<Flame size={40} style={{ color: sub }} />} testo={t.soloCamere} colore={sub} />;
 
-  if (loading) {
-    return (
-      <div className="flex-1 flex flex-col items-center justify-center gap-3" style={{ color: sub }}>
-        <Loader2 size={26} className="animate-spin-slow" style={{ color: RED }} />
-        <p className="text-sm">{t.loading}</p>
-      </div>
-    );
-  }
+  if (loading) return <StatoCaricamento testo={t.loading} colore={sub} />;
 
   if (error) {
-    return (
-      <div className="flex-1 flex flex-col items-center justify-center gap-3 px-8 text-center" style={{ color: sub }}>
-        <AlertTriangle size={26} style={{ color: "var(--destructive)" }} />
-        <p className="text-sm">{spenta ? T_APP[lang].funzioneNonAttiva : t.netError}</p>
-        <button onClick={load} className="rounded-xl px-4 py-2 text-sm font-semibold" style={{ background: RED, color: RED_FG }}>
-          {t.retry}
-        </button>
-      </div>
-    );
+    return <StatoErrore testo={spenta ? T_APP[lang].funzioneNonAttiva : t.netError} retry={t.retry} onRetry={load} colore={sub} />;
   }
 
   if (!stato?.attiva || !stato.evento) {
