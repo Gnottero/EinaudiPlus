@@ -42,7 +42,7 @@ nelle sale).
 | `api/cron.js` | invia i promemoria dovuti. Lo chiama `pg_cron`, non Vercel |
 | `api/telegram.js` | webhook del bot |
 | `api/admin/auth.js` · `api/admin/data.js` | accesso e operazioni riservate |
-| `api/_lib/` | pezzi condivisi: `db.js` (chiamate SQL), `http.js` (lettura corpo, validazione, rate limit), `auth.js` (password e sessioni), `push.js` (invio Web Push) |
+| `api/_lib/http.js` | lettura del corpo, risposte JSON, controllo del metodo. Il resto (db, auth, push, rate limit) vive in `src/shared/` e `src/modules/` |
 | `supabase/` | schema e funzioni SQL, consolidati. `migrations/` è la storia delle modifiche, numerata |
 
 ## Il database

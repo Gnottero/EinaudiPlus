@@ -17,6 +17,7 @@ import type { RoomKind, RoomBooking, CinemaType } from "../../roomsApi";
 import RuotaPicker from "../../RuotaPicker";
 import { Toast } from "../../pannelli";
 import { pianoDi, colorePiano } from "../../piani";
+import { isValidRoom } from "../../modello";
 import { call as adminCall } from "../admin-shared/adminApi";
 import type { Role as AdminRole } from "../../AdminPanel";
 
@@ -291,35 +292,6 @@ const T = {
     formatoCamera: "¡Formato de habitación no válido!",
     confirmDeleteOther: (n: string) => `Reserva de ${n}: ¿confirmas la eliminación?`,
   },
-  nap: {
-    cinema: "Sala Cinema", music: "Sala Musica",
-    days: ["Lun", "Mar", "Mer", "Gio", "Ven", "Sab", "Dom"],
-    daysLong: ["Lunnerì", "Marterì", "Miercurì", "Gioverì", "Viernarì", "Sabbato", "Dummeneca"],
-    rules: "Regole", close: "Chiure",
-    free: "Libbera tutt''o juorno", occupied: "Occupata",
-    newBooking: "Prenotazione nova",
-    start: "Accumencia", end: "Fernesce", name: "Nomme", yourName: "'O nomme tuoio", roomLabel: "Cammera",
-    type: "Tipo 'e proiezione", priv: "Privata", open: "Aperta a tuttu quante",
-    book: "Prenòta", cancel: "Lassa sta'",
-    bookings: "Prenotazioni d''a jurnata", none: "Nisciuna prenotazione",
-    needName: "Miette nu nomme", badRange: "L'ora 'e fine adda sta' doppo chella 'e accummenciamento",
-    overlap: "Se 'ntoppa cu n'ata prenotazione",
-    full: "Juorno chino: massimo 6 prenotazioni.",
-    errorGeneric: "Errore, prova n'ata vota.",
-    loading: "Sto' carrecanno…", retry: "Prova n'ata vota", netError: "Nun riesco a parla' cu 'o server.",
-    closedNotice: "'A sala è chiusa pecché ce stanno tenenno 'e pacche 'a dinto.",
-    closeRoomBtn: "Chiure pe' tené 'e pacche", reopenRoomBtn: "Arape n'ata vota 'a sala",
-    closeShort: "Chiure", reopenShort: "Arape",
-    rulesTitle: "Regulamento", tipsTitle: "Guaje 'e connessione",
-    musicNote: "Strumenti senza cuffie: se ponno sunà sulo 'a 16:00 ê 20:00.",
-    overnightPart: "serata ca passa 'a mezanotte",
-    resetToMyRoom: "↩ Rimiette 'a cammera toia",
-    giornoSuccessivo: "(o juorno appriesso)",
-    aNomeDi: "A nomme 'e",
-    aNomeDiPlaceholder: "Es. Formazione PFP",
-    formatoCamera: "'O formato d''a cammera nun va buono!",
-    confirmDeleteOther: (n: string) => `Prenotazione 'e ${n}: sicuro ca vuo' cancellà?`,
-  },
 } as const;
 
 // ─── Testi regolamenti ──────────────────────────────────────────────────────
@@ -328,11 +300,6 @@ const T = {
 // versione che vale resta quella italiana; le altre sono traduzioni di
 // cortesia, per chi l'italiano non lo legge bene. Se la direzione cambia una
 // regola, si cambia l'italiano e poi le traduzioni — mai il contrario.
-//
-// Vale anche per il napoletano, che prima qui non c'era e ricadeva
-// sull'italiano: chi mette l'app in napoletano si trovava l'unica schermata di
-// testo lungo in un'altra lingua. È una cortesia come le altre cinque — se
-// c'è dubbio su cosa dice una regola, fa fede l'italiano.
 type Regolamento = { rules: string[]; tips?: string[] };
 
 const RULES: Record<RoomKind, Partial<Record<Lang, Regolamento>>> = {
@@ -402,19 +369,6 @@ const RULES: Record<RoomKind, Partial<Record<Lang, Regolamento>>> = {
         "Para conectar el ordenador al equipo de audio: activad el Bluetooth en el ordenador, encended la barra de sonido y pulsad en el mando la tecla con el símbolo de Bluetooth (*). En la pantalla aparecerá «BT PAIRING»; buscad entonces la barra entre los dispositivos del ordenador.",
       ],
     },
-    nap: {
-      rules: [
-        "'A sala se pò prenotà a qualunque ora.",
-        "Dint'â sala nce sta nu proiettore (cu 'o cavo HDMI già 'ncoppa) e n'impianto audio (s'attacca cu 'o Bluetooth). Arricurdateve 'e purtà 'o PC vuosto.",
-        "Chi prenota risponne d''e danne e d''a pulizia d''a sala.",
-        "Pe' prenotà, mettite l'ora ca pensate 'e ce sta', 'o nomme vuosto e si è pe' vuje sulo o si è na proiezione aperta a tuttu quante (pe' dì, 'e partite).",
-        "'E prenotazioni se azzerano ogne lunnerì 'e notte.",
-      ],
-      tips: [
-        "Pe' attaccà 'o PC ô proiettore: appicciate 'o proiettore c''o telecomando, scegliete \"Source\" e po' HDMI 2 (s'avess'a attaccà da sulo).",
-        "Pe' attaccà 'o PC a l'impianto audio: appicciate 'o Bluetooth ncopp'ô PC, appicciate 'a soundbar, e ppo' schiaffate 'o tasto d''o telecomando c''o segno d''o Bluetooth (*). Ncopp'ô schermo d''a soundbar esce \"BT PAIRING\": a chillu punto cercate 'a soundbar 'nmiez'ê dispositive d''o PC.",
-      ],
-    },
   },
   music: {
     it: {
@@ -455,14 +409,6 @@ const RULES: Record<RoomKind, Partial<Record<Lang, Regolamento>>> = {
         "Se puede usar a cualquier hora (ATENCIÓN: el uso de instrumentos SIN auriculares está permitido SOLO de 16:00 a 20:00).",
         "Quien reserva es responsable de los posibles daños y de la limpieza de la sala.",
         "Las reservas se reinician cada lunes por la noche.",
-      ],
-    },
-    nap: {
-      rules: [
-        "'A putite prenotà quanno vulite.",
-        "Se pò ausà a qualunque ora (ATTIENTE: 'e strumente SENZA cuffie se ponno sunà SULO 'a 16:00 ê 20:00).",
-        "Chi prenota risponne d''e danne e d''a pulizia d''a sala.",
-        "'E prenotazioni se azzerano ogne lunnerì 'e notte.",
       ],
     },
   },
@@ -727,8 +673,7 @@ export default function RoomView({ room, lang, roomNumber, adminRole }: {
     // `who` è il nome scritto a mano, non un numero, e il regex lo respingeva
     // sempre a meno che non fosse fatto di sole cifre.
     if (myRoom && !direzione) {
-      const regexCamera = /^\d+(?:-?[a-bA-B])?$/;
-      if (!regexCamera.test(who)) {
+      if (!isValidRoom(who)) {
         setToast(t.formatoCamera); return;
       }
     }

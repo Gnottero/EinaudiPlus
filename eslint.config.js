@@ -39,4 +39,18 @@ export default [
       }],
     },
   },
+  // Import e variabili inutilizzati nel backend (il frontend e' gia' coperto
+  // da noUnusedLocals in tsconfig.json).
+  {
+    files: ["src/**/*.js", "api/**/*.js"],
+    languageOptions: {
+      ecmaVersion: "latest",
+      sourceType: "module",
+      globals: { process: "readonly", console: "readonly", Buffer: "readonly", URL: "readonly", setTimeout: "readonly", clearTimeout: "readonly", fetch: "readonly", AbortController: "readonly", TextEncoder: "readonly" },
+    },
+    rules: {
+      "no-unused-vars": ["error", { args: "none", caughtErrors: "none" }],
+      "no-undef": "error",
+    },
+  },
 ];

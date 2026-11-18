@@ -258,53 +258,6 @@ const T = {
     ticketUsatoChiudi: "Listo",
     ticketNumero: "Número",
   },
-  nap: {
-    titolo: "Grigliata",
-    loading: "Sto' carrecanno…",
-    retry: "Prova n'ata vota",
-    netError: "Nun riesco a parlà cu 'o server.",
-    soloCamere: "Chesta sezione è pe' 'e cammere: 'a Direzione nun ce sta.",
-    nessunaAttiva: "Mo nun ce sta nisciuna grigliata.",
-    scadeIl: (d: string) => `'E adesioni chiudono ô ${d}`,
-    scadeIlChiuse: (d: string) => `'E adesioni so' chiuse da ô ${d}`,
-    adesioniChiuse: "'E adesioni so' chiuse: nun se pò cchiù aderì né cagnà.",
-    siMangiaIl: (d: string) => `Se magna ô ${d}`,
-    menuLabel: "Qua menu vuò?",
-    infoTitolo: "Dimme 'e te",
-    infoDesc: "Accussì chi cucina te prepara pure a te quaccosa.",
-    dietaLabel: "Tiene 'na dieta particolare?",
-    dietaClassico: "Magno 'e tutto",
-    dietaVegetariano: "Vegetariano",
-    dietaVegano: "Vegano",
-    senzaGlutine: "Senza glutine",
-    senzaGlutineHint: "Celiachia o intolleranza ô glutine",
-    noteLabel: "Note (si vuò)",
-    notePlaceholder: "Allergie, intolleranze o chello ca chi cucina adda sapé",
-    note: "Note",
-    partecipaBtn: "Ce sto",
-    cambiaScelta: "Cagna",
-    partecipi: "Staje dinto!",
-    menuScelto: (m: string) => `Menu: ${m}`,
-    pagamentoTitolo: "Manna 'a quota toja",
-    quota: (q: string) => `Quota a cristiano: ${q}`,
-    pagamentiDisattivati: "P' mo' 'e pagamente so' stutate: nun hê 'a mannà niente dall'app. 'O delegato te fa sapé si e comme pagà.",
-    pagamentoDesc: "Adopera uno d''e link ccà sotto pe' mannà 'a quota, po' tocca \"Aggio pagato\".",
-    causalePagamento: "Importante: scrive 'o nummero d''a cammera toja dint''a nota d''o pagamento, accussì 'o delegato te ricanosce.",
-    paypalBtn: "Paga cu PayPal",
-    satispayBtn: "Paga cu Satispay",
-    dichiaraPagamento: "Aggio pagato",
-    inAttesaConferma: "Aspettanno 'a conferma",
-    pagamentoConfermato: "Pagamento confermato",
-    erroreAzione: "Nun ha' fatto, prova n'ata vota.",
-    ticketTitolo: "'E ticket tuoje",
-    ticketScorriUsa: "Scorri pe' l'adoperà",
-    ticketUsaHint: "Scorri sulamente nnanz'a chi te serve: 'o nummero esce sulo tanno, nun primm'.",
-    ticketUsato: (n: number) => `Adoperato · n. ${n}`,
-    ticketBloccato: (d: string) => `Se sbloccano 'o ${d}`,
-    ticketUsatoAlle: "Adoperato a ll'ora",
-    ticketUsatoChiudi: "Fatto",
-    ticketNumero: "Nummero",
-  },
 } as const;
 
 /**
@@ -323,7 +276,7 @@ function href(link: string): string {
 /** "20 settembre" da un `date` puro ("AAAA-MM-GG", senza orario) — split sui
  *  componenti invece di passare per `new Date(iso)`: letto come UTC e
  *  riformattato in fuso locale potrebbe slittare di un giorno. */
-const LOCALE: Record<Lang, string> = { it: "it-IT", en: "en-GB", fr: "fr-FR", de: "de-DE", es: "es-ES", nap: "it-IT" };
+const LOCALE: Record<Lang, string> = { it: "it-IT", en: "en-GB", fr: "fr-FR", de: "de-DE", es: "es-ES" };
 
 function fmtGiorno(dataIso: string, lang: Lang): string {
   const [y, m, d] = dataIso.split("-").map(Number);

@@ -15,7 +15,7 @@ export interface AccessibilityPrefs {
 
 // ─── Default ───────────────────────────────────────────────────────────────────
 
-export const DEFAULT_COLORS: Record<StatusKey, string> = {
+const DEFAULT_COLORS: Record<StatusKey, string> = {
   free:  "#22c55e",
   inuse: "#eab308",
   oos:   "#ff4757",
@@ -42,7 +42,7 @@ function gialloMigrato(salvato: string | undefined | null): string {
   return GIALLI_SUPERATI.has(salvato.toLowerCase()) ? DEFAULT_COLORS.inuse : salvato;
 }
 
-export const DEFAULT_ICONS: Record<StatusKey, string> = {
+const DEFAULT_ICONS: Record<StatusKey, string> = {
   free:  "●",
   inuse: "●",
   oos:   "●",
@@ -148,16 +148,4 @@ export function applyToDOM(prefs: AccessibilityPrefs): void {
 /** Restituisce l'icona configurata per un dato stato. */
 export function iconFor(status: StatusKey, prefs: AccessibilityPrefs): string {
   return prefs.icons[status];
-}
-
-/** true se almeno un'impostazione differisce dal default. */
-export function isCustomized(prefs: AccessibilityPrefs): boolean {
-  return (
-    prefs.colors.free  !== DEFAULT_COLORS.free  ||
-    prefs.colors.inuse !== DEFAULT_COLORS.inuse ||
-    prefs.colors.oos   !== DEFAULT_COLORS.oos   ||
-    prefs.icons.free   !== DEFAULT_ICONS.free   ||
-    prefs.icons.inuse  !== DEFAULT_ICONS.inuse  ||
-    prefs.icons.oos    !== DEFAULT_ICONS.oos
-  );
 }

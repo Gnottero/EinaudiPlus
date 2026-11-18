@@ -80,19 +80,6 @@ const T = {
     netError: "No se puede contactar con el servidor.",
     soloCamere: "Esta sección es para las habitaciones: la Dirección no tiene una.",
   },
-  nap: {
-    titolo: "Bici",
-    desc: "Fa' sapé â reception si tiene 'na bicicletta 'o cullegio.",
-    siHo: "Hê dichiarato 'na bici",
-    daReception: "T''a segnata 'a reception. Si nun è ggiusto, 'a può levà.",
-    nonHo: "Nun hê dichiarato nisciuna bici",
-    aggiungi: "Sì, tengo 'na bici",
-    rimuovi: "Nun 'a tengo cchiù",
-    loading: "Sto' carrecanno…",
-    retry: "Prova n'ata vota",
-    netError: "Nun riesco a parlà cu 'o server.",
-    soloCamere: "Chesta sezione è pe' 'e cammere: 'a Direzione nun ne tene.",
-  },
 } as const;
 
 // ─── Illustrazione ───────────────────────────────────────────────────────────

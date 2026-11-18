@@ -28,7 +28,7 @@ function getClient(): RealtimeClient | null {
   return client;
 }
 
-export type Canale = {
+type Canale = {
   topic: string;
   /** Attesa casuale (0..jitterMs) prima di ricaricare. Per un canale
    *  ascoltato da tutti (es. ~90 telefoni) sparpaglia le richieste invece di

@@ -14,20 +14,12 @@ import en from "./lingue/en";
 import fr from "./lingue/fr";
 import de from "./lingue/de";
 import es from "./lingue/es";
-import nap from "./lingue/nap";
 import type { Testi } from "./lingue/it";
 
 export type { Testi };
-export type Lang = "it" | "en" | "fr" | "de" | "es" | "nap";
+export type Lang = "it" | "en" | "fr" | "de" | "es";
 
-/**
- * Il napoletano è parziale di proposito: ciò che non è tradotto ricade
- * sull'italiano. Per un dialetto è la ricaduta giusta — una frase non tradotta
- * resta comprensibile — e permette di riempirlo una riga alla volta.
- */
-const napCompleto: Testi = { ...it, ...nap };
-
-export const T: Record<Lang, Testi> = { it, en, fr, de, es, nap: napCompleto };
+export const T: Record<Lang, Testi> = { it, en, fr, de, es };
 
 // ─── L'elenco per il selettore ───────────────────────────────────────────────
 
@@ -42,7 +34,6 @@ export const LINGUE: { id: Lang; etichetta: string; bandiera: string }[] = [
   { id: "fr",  etichetta: "Français",   bandiera: "🇫🇷" },
   { id: "de",  etichetta: "Deutsch",    bandiera: "🇩🇪" },
   { id: "es",  etichetta: "Español",    bandiera: "🇪🇸" },
-  { id: "nap", etichetta: "Napulitano", bandiera: "🍕" },
 ];
 
 // ─── Preferenza salvata ──────────────────────────────────────────────────────
@@ -53,8 +44,7 @@ const CHIAVE_LINGUA = "einaudiplus.lingua";
  * La lingua da usare all'avvio.
  *
  * Prima quella scelta a mano, poi quella del browser se la conosciamo, poi
- * l'italiano. Il napoletano non si prende mai dal browser — non ha un codice
- * che un browser mandi — quindi ci si arriva solo scegliendolo.
+ * l'italiano.
  */
 export function linguaIniziale(): Lang {
   try {

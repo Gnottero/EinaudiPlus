@@ -31,7 +31,7 @@ const VOCE = 34;
 /** Quante voci si vedono insieme. Dispari, così ce n'è una esattamente al centro. */
 const VISIBILI = 5;
 
-export const RUOTA_ALTEZZA = VOCE * VISIBILI;
+const RUOTA_ALTEZZA = VOCE * VISIBILI;
 
 export default function RuotaPicker({ valori, indice, onCambia, ariaLabel }: {
   valori: string[];

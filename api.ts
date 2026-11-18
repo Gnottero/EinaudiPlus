@@ -309,9 +309,9 @@ export async function clearAsDirezione(day: number, slot: number, machine: strin
 // postAction() sopra.
 
 /** Un menu fra cui scegliere — li decide il delegato per ogni grigliata. */
-export interface GrigliataMenu { id: number; nome: string }
+interface GrigliataMenu { id: number; nome: string }
 
-export interface GrigliataEvento {
+interface GrigliataEvento {
   id: number; titolo: string;
   /** Quando si fermano le iscrizioni — può essere già passata. */
   scadenza: string;
@@ -340,7 +340,7 @@ export type GrigliataDieta = "classico" | "vegetariano" | "vegano";
  *  finché non si usa quel ticket. `emoji` la sceglie il delegato (facoltativa). */
 export interface GrigliataTicket { id: number; nome: string; emoji: string | null; usato: boolean; numero: number | null }
 
-export interface GrigliataMiaAdesione {
+interface GrigliataMiaAdesione {
   menuId: number;
   dieta: GrigliataDieta;
   senzaGlutine: boolean;

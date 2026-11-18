@@ -119,9 +119,9 @@ section("adminWeek()");
 section("adminSetMachineStatus()");
 {
   const repo = fakeRepository();
-  await adminSetMachineStatus({ room: "100", machine: "W-C", oos: true }, { laundryRepository: repo });
+  await adminSetMachineStatus({ room: "50", machine: "W-C", oos: true }, { laundryRepository: repo });
   check("camera valida passa, machine resta libero (decide il database)",
-    repo.calls[0].args.room === "100" && repo.calls[0].args.machine === "W-C" && repo.calls[0].args.oos === true);
+    repo.calls[0].args.room === "50" && repo.calls[0].args.machine === "W-C" && repo.calls[0].args.oos === true);
 
   const err = await throws(() => adminSetMachineStatus({ room: "xyz", machine: "W-C", oos: true }, { laundryRepository: fakeRepository() }));
   check("camera malformata respinta", err?.message === "camera non valida");
@@ -143,12 +143,12 @@ section("adminDeleteBooking()");
 
 section("adminForceBook() / adminBookAsDirezione() / adminClearAsDirezione()");
 {
-  const errFB = await throws(() => adminForceBook({ laundryId: 1, day: 1, slot: 5, machine: "W-A", room: "100" }, { laundryRepository: fakeRepository() }));
+  const errFB = await throws(() => adminForceBook({ laundryId: 1, day: 1, slot: 5, machine: "W-A", room: "50" }, { laundryRepository: fakeRepository() }));
   check("forceBook con input validi non lancia errori di validazione", errFB === null, JSON.stringify(errFB?.message));
 
   const repoFB = fakeRepository();
-  await adminForceBook({ laundryId: 1, day: 1, slot: 5, machine: "W-A", room: "100" }, { laundryRepository: repoFB });
-  check("forceBook: camera valida passa", repoFB.calls[0].args.room === "100");
+  await adminForceBook({ laundryId: 1, day: 1, slot: 5, machine: "W-A", room: "50" }, { laundryRepository: repoFB });
+  check("forceBook: camera valida passa", repoFB.calls[0].args.room === "50");
 
   const errFBRoom = await throws(() => adminForceBook({ laundryId: 1, day: 1, slot: 5, machine: "W-A", room: "../etc" }, { laundryRepository: fakeRepository() }));
   check("forceBook: camera malformata respinta", errFBRoom?.message === "camera non valida");

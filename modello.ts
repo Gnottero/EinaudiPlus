@@ -15,7 +15,7 @@ import { version as PACKAGE_VERSION } from "./package.json";
 
 // ─── Tipi ────────────────────────────────────────────────────────────────────
 
-export type MachineStatus = "available" | "in-use" | "out-of-order";
+type MachineStatus = "available" | "in-use" | "out-of-order";
 export type MachineType   = "washer" | "dryer";
 
 export type WeekData   = api.WeekData;
@@ -88,7 +88,7 @@ function nowInfo(d = new Date()) {
   return { dayIdx: dow, slotIdx: slot, early, base };
 }
 
-export const NOW       = nowInfo();
+const NOW       = nowInfo();
 export const TODAY_DOW = NOW.dayIdx;
 export const CUR_SLOT  = NOW.slotIdx;
 export const PREV_SLOT = CUR_SLOT - 1;
@@ -139,7 +139,7 @@ ORDINE_GIORNI.forEach((giorno, pos) => { RANGO_GIORNI[giorno] = pos; });
 export { RANGO_GIORNI };
 
 const MONDAY = new Date(NOW.base.getFullYear(), NOW.base.getMonth(), NOW.base.getDate() - TODAY_DOW);
-export const WEEK_DATES = Array.from({ length: 7 }, (_, i) => {
+const WEEK_DATES = Array.from({ length: 7 }, (_, i) => {
   const d = new Date(MONDAY.getFullYear(), MONDAY.getMonth(), MONDAY.getDate() + i);
   // Il lunedì che si vede durante l'anteprima è già quello della settimana
   // dopo: la data mostrata deve dirlo, non restare quella del lunedì appena
@@ -187,15 +187,18 @@ export function finestraCambioBiancheriaAttiva(d: Date): boolean {
   return d.getDay() === 2 && d.getHours() >= 5 && d.getHours() < 14;
 }
 
-/** "1:23:45" o "23:45" — il conto alla rovescia in dashboard. */
-export function fmtCountdown(ms: number) {
-  const s = Math.max(0, Math.floor(ms / 1000));
-  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return h > 0 ? `${h}:${pad(m)}:${pad(sec)}` : `${pad(m)}:${pad(sec)}`;
-}
-
 // ─── Macchine ────────────────────────────────────────────────────────────────
+
+/**
+ * Numero di camera valido: Manica 1–50 (zeri iniziali ammessi), Valentino
+ * 101–536 (piano 1–5, camera 01–36), lettera a/b finale facoltativa.
+ *
+ * Stessa regola di src/shared/validation/room.js (parseRoomNumber): vanno
+ * tenute allineate a mano. Le funzioni SQL accettano ancora il formato piu'
+ * largo `^[0-9]{1,4}(-?[abAB])?$`; il server JS e' il cancello vero.
+ */
+const REGEX_CAMERA = /^(?:0*(?:[1-9]|[1-4][0-9]|50)|[1-5](?:0[1-9]|[1-2][0-9]|3[0-6]))(-?[abAB])?$/;
+export const isValidRoom = (v: string): boolean => REGEX_CAMERA.test(v.trim());
 
 /**
  * Quali macchine esistono FISICAMENTE nella lavanderia di una camera.
@@ -223,7 +226,7 @@ export function bookingAt(week: WeekData, day: number, slot: number, wid: string
 }
 
 /** Il turno precedente, scavalcando all'indietro il cambio di giorno. */
-export function prevRef(day: number, slot: number) {
+function prevRef(day: number, slot: number) {
   if (slot > 0) return { day, slot: slot - 1 };
   return { day: (day + 6) % 7, slot: N_SLOTS - 1 };
 }

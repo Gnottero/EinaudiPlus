@@ -65,4 +65,3 @@ export const SUB  = "var(--gray-accessible-text)";
 export const DIV  = "var(--border)";
 export const SURF = "var(--card)";
 export const CHIP = "var(--secondary)";
-export const BG   = "var(--background)";

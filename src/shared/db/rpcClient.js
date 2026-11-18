@@ -42,12 +42,3 @@ export async function rpc(fn, args = {}) {
   if (!raw) return null;
   try { return JSON.parse(raw); } catch { return raw; }
 }
-
-/** Come rpc(), ma non solleva: le letture non devono far cadere la pagina. */
-export async function rpcSafe(fn, args = {}) {
-  try {
-    return await rpc(fn, args);
-  } catch (err) {
-    return { ok: false, error: err.message };
-  }
-}

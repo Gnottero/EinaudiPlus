@@ -52,7 +52,7 @@ const overlaps = (list: RoomBooking[], b: { day: number; start: number; end: num
 
 // ─── API ─────────────────────────────────────────────────────────────────────
 
-export interface RoomState {
+interface RoomState {
   bookings: RoomBooking[];
   /** Chiusa dall'FDO/sistemista (es. per il deposito dei pacchi): mentre è
    *  vera, bookRoom() la rifiuta comunque — questo campo è solo per

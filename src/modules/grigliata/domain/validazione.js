@@ -19,11 +19,11 @@ export const MENU_NOME_MAX = 40;
 // per ciascuna (vedi grigliata_admin_conferma_pagamento in SQL). Stessi
 // tetti del menu, un livello più in basso.
 export const TICKET_MAX = 10;
-export const TICKET_NOME_MAX = 40;
+const TICKET_NOME_MAX = 40;
 // v1.8: l'emoji facoltativa di una voce-ticket (es. 🌭). Stesso tetto del
 // vincolo `check` in SQL (char_length conta i code point, come Array.from):
 // 16 bastano anche per le emoji composte (famiglie, bandiere, toni di pelle).
-export const TICKET_EMOJI_MAX = 16;
+const TICKET_EMOJI_MAX = 16;
 
 /**
  * Ripulisce e controlla l'elenco delle voci-ticket di UN menu: un array di
@@ -115,7 +115,7 @@ export function idValido(v) {
 // dal delegato, es. "Carne"/"Pesce") abbia scelto: si può benissimo
 // scegliere "Carne" e dichiararsi vegani (il delegato prepara qualcosa a
 // parte). Stessa idea di "senza glutine", solo con tre stati invece di due.
-export const DIETA_VALORI = ["classico", "vegetariano", "vegano"];
+const DIETA_VALORI = ["classico", "vegetariano", "vegano"];
 
 /** Un valore mancante o non riconosciuto ricade su "classico" (mangia di
  *  tutto): non è un errore bloccante, è l'informazione di default — stessa
@@ -138,7 +138,7 @@ export function isValidDate(v) {
 }
 
 // v1.4.1: la quota a persona. Stesso tetto del vincolo `check` in SQL.
-export const QUOTA_MAX = 1000;
+const QUOTA_MAX = 1000;
 
 /**
  * Interpreta la quota scritta dal delegato: numero o stringa, con la

@@ -14,7 +14,7 @@
 // chi non distingue i colori; il piano di una camera non porta quel peso —
 // è un raggruppamento, non un giudizio sullo stato di qualcosa.
 
-export type Piano = "manica" | "1" | "2" | "3" | "4" | "basso";
+type Piano = "manica" | "1" | "2" | "3" | "4" | "basso";
 
 /** In quest'ordine, dal basso in su: Manica prima perché è un edificio a
  *  parte, poi i piani del Valentino dal primo al quarto, poi il basso

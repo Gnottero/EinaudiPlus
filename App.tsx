@@ -23,7 +23,7 @@ import { FeedbackModal } from "./features/feedback/FeedbackModal";
 // Le regole della lavanderia (turni, macchine, prenotazioni) e i testi stanno
 // in file loro: qui restano i componenti. Vedi modello.ts, i18n.ts, tema.ts.
 import {
-  APP_VERSION,
+  APP_VERSION, isValidRoom,
   favsKey, loadFavs,
   type WeekData, type StatusData, type Fav,
 } from "./modello";
@@ -91,9 +91,8 @@ function LoginScreen({ lang, onLogin, onAdmin }: {
   function submit() {
     if (room.length === 0) return;
     if (room === ROOM_ADMIN) { setRoom(""); onAdmin(); return; }
-    const regexCamera = /^\d+(?:-?[a-bA-B])?$/;
-    if (!regexCamera.test(room)) {
-      alert("Formato non valido. Esempi validi: 112, 21-b, 112A");
+    if (!isValidRoom(room)) {
+      alert("Formato non valido. Esempi validi: 112, 21-b, 112A (Manica 1–50, Valentino 101–536)");
       return;
     }
     onLogin(room);

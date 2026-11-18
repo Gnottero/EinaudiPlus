@@ -428,7 +428,7 @@ export const Dashboard = memo(function Dashboard({ lang, week, status, roomNumbe
   );
 });
 
-export function TortaTurno({ restaFrazione, colore, size = 15 }: {
+function TortaTurno({ restaFrazione, colore, size = 15 }: {
   restaFrazione: number; colore: string; size?: number;
 }) {
   const r = 7;
@@ -457,7 +457,7 @@ export function TortaTurno({ restaFrazione, colore, size = 15 }: {
 // dentro — a tutta larghezza, non tre card strette affiancate: qui il testo
 // puo' stare a dimensione normale invece che a 8-9px, e "chi l'aveva prima"
 // sta in fondo alla riga, accanto allo stato, non impilato sotto.
-export function SchedaGruppoMacchine({ lettera, washer, dryer, lang }: {
+function SchedaGruppoMacchine({ lettera, washer, dryer, lang }: {
   lettera: string; washer?: Machine; dryer?: Machine; lang: Lang;
 }) {
   return (
@@ -470,7 +470,7 @@ export function SchedaGruppoMacchine({ lettera, washer, dryer, lang }: {
   );
 }
 
-export function TesseraMacchina({ machine, lang }: { machine: Machine; lang: Lang }) {
+function TesseraMacchina({ machine, lang }: { machine: Machine; lang: Lang }) {
   const t = T[lang];
   const isFree = machine.status === "available";
   const isOOO  = machine.status === "out-of-order";

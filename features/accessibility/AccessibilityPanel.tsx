@@ -103,22 +103,6 @@ const T = {
     oosDesc: "Marcada como averiada.",
     close: "Cerrar",
   },
-  nap: {
-    title: "Accessibilità",
-    subtitle: "Aggiusta comme se vedono 'e state",
-    colors: "Culure d''e state",
-    icons: "Icone d''e state",
-    preview: "Anteprima",
-    presets: "Preset pe' 'o daltonismo",
-    reset: "Rimiette comm'era",
-    free: "Libbera",
-    inuse: "Sta 'nfunziona",
-    oos: "Fora servizio",
-    freeDesc: "Se po' prenotà.",
-    inuseDesc: "Turno ca sta jenno.",
-    oosDesc: "Segnalata rotta.",
-    close: "Chiure",
-  },
 } as const;
 
 // Nomi e descrizioni degli stati si ricavano da T invece di stare in due

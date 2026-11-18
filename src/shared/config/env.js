@@ -14,7 +14,3 @@ export const env = {
   get appToken() { return process.env.APP_TOKEN || null; },
   get cronSecret() { return process.env.CRON_SECRET || null; },
 };
-
-export function isConfigured(...keys) {
-  return keys.every((k) => Boolean(env[k]));
-}

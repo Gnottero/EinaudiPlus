@@ -33,7 +33,7 @@ function dataLunga(iso: string, lang: Lang) {
 }
 
 const LOCALE_PER_LINGUA: Record<Lang, string> = {
-  it: "it-IT", en: "en-GB", fr: "fr-FR", de: "de-DE", es: "es-ES", nap: "it-IT",
+  it: "it-IT", en: "en-GB", fr: "fr-FR", de: "de-DE", es: "es-ES",
 };
 
 /**
