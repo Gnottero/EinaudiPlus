@@ -1,10 +1,26 @@
-# EinaudiPlus
+[![EinaudiPlus logo](docs/images/logo.svg)](docs/images/logo.svg)
+
+EinaudiPlus
+===========
+
+[](#einaudiplus)
 
 App del Collegio Einaudi per prenotare **lavanderia**, **sala cinema** e **sala
 musica**, oltre a funzioni minori (bici, sala polivalente, cambio biancheria,
-grigliate), per una o più **sezioni** del collegio. È una PWA: si installa dal browser e manda promemoria push.
+grigliate), per una o più **sezioni** del collegio. È una PWA: si installa dal
+browser e manda promemoria push.
 
-## Com'è fatta
+Requisiti per lavorarci:
+
+* Node.js e npm
+* Docker, solo per `npm run test:sql`
+* Un progetto Supabase e uno Vercel per il deploy (vedi [DEPLOY.md](DEPLOY.md))
+
+Com'è fatta
+-----------
+
+[](#com-e-fatta)
+
 
 ```
 browser ──▶ /api/* (funzioni serverless Vercel) ──▶ Postgres (Supabase)
@@ -18,21 +34,26 @@ solo lato server. Tutte le scritture passano da funzioni SQL, che sono anche il
 posto dove vivono i vincoli (niente doppie prenotazioni, niente sovrapposizioni
 nelle sale).
 
-## I file, e cosa c'è dentro
+I file, e cosa c'è dentro
+-------------------------
 
-### Frontend
+[](#i-file-e-cosa-c-e-dentro)
+
+
+**Frontend**
 
 | File | Cosa fa |
 |---|---|
-| `App.tsx` | la lavanderia: dashboard, vista giornaliera, griglia settimanale, e il guscio dell'app |
-| `Rooms.tsx` | cinema e musica, che funzionano a fasce libere invece che a turni fissi |
+| `App.tsx` · `shell/` | il guscio dell'app (stato globale, routing); `shell/` ha login, sidebar, menu mobile, tema stagionale e la configurazione di navigazione |
+| `features/<dominio>/` | una cartella per dominio (laundry, common-spaces, grigliata, bikes, ...), residenti e `admin/`. `features/common-spaces/` = cinema e musica a fasce libere |
+| `panels/` | fogli trasversali: Toast, Impostazioni, promemoria, installazione PWA |
 | `AdminPanel.tsx` | le sezioni riservate (macchine, segnalazioni, ricorrenti, manutenzione). Caricato solo a chi fa l'accesso |
 | `AccessibilityPanel.tsx` · `statusConfig.ts` | colori e simboli di stato personalizzabili |
 | `api.ts` · `roomsApi.ts` | le uniche due porte verso `/api`. Nessun altro file fa `fetch` di dati |
 | `push.ts` · `public/sw.js` | notifiche push |
 | `style.css` | i design token. **Da leggere prima di toccare un colore**: la palette ha due livelli e il perché è spiegato lì |
 
-### Backend
+**Backend**
 
 | File | Cosa fa |
 |---|---|
@@ -41,11 +62,15 @@ nelle sale).
 | `api/grigliata.js` | adesione, menu e dichiarazione di pagamento per una grigliata attiva |
 | `api/cron.js` | invia i promemoria dovuti. Lo chiama `pg_cron`, non Vercel |
 | `api/telegram.js` | webhook del bot |
-| `api/admin/auth.js` · `api/admin/data.js` | accesso e operazioni riservate |
+| `api/admin/auth.js` · `api/admin/data.js` | accesso e pipeline delle operazioni riservate (sessione, ruolo, ambito); le azioni stanno in `api/admin/_actions/<dominio>.js`, le regole sul contenuto in `_guards.js` |
 | `api/_lib/http.js` | lettura del corpo, risposte JSON, controllo del metodo. Il resto (db, auth, push, rate limit) vive in `src/shared/` e `src/modules/` |
 | `supabase/` | schema e funzioni SQL, consolidati. `migrations/` è la storia delle modifiche, numerata |
 
-## Il database
+Il database
+-----------
+
+[](#il-database)
+
 
 I file in `supabase/` sono **consolidati**: contengono lo stato attuale, non
 quello iniziale. Ricostruire un database da zero significa eseguirli in
@@ -78,7 +103,11 @@ sessione, hash delle password e rate limit in un colpo solo.
 i file qui sopra. Restano perché spiegano **perché** una cosa è come è, e
 perché vanno applicate una alla volta al database che è già in produzione.
 
-## Lavorarci
+Sviluppo
+--------
+
+[](#sviluppo)
+
 
 ```bash
 npm install
@@ -101,7 +130,11 @@ node scripts/db.cjs apply supabase/migrations/00X-nome.sql
 node scripts/db.cjs query "select ..."
 ```
 
-## Due cose da sapere prima di cambiare qualcosa
+Due cose da sapere prima di cambiare qualcosa
+---------------------------------------------
+
+[](#due-cose-da-sapere-prima-di-cambiare-qualcosa)
+
 
 **L'identità è autodichiarata.** Il numero di camera sta in `localStorage` e
 chiunque può scriverci quello che vuole. Non c'è un login per i residenti. Da
@@ -124,7 +157,11 @@ password con hash scrypt) e i loro poteri sono verificati sul server. Si entra
 dall'indirizzo `/admin` (nessun link dall'app dei residenti), con nome utente, password e
 verifica anti-bot Cloudflare Turnstile (vedi DEPLOY.md).
 
-## Documenti
+Documenti
+---------
+
+[](#documenti)
+
 
 - [DEPLOY.md](DEPLOY.md) — variabili d'ambiente, scheduler, migrazione da Google
   Sheets, e le trappole (fra cui: **mai commenti in `vercel.json`**)
