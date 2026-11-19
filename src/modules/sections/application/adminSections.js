@@ -123,6 +123,14 @@ export async function adminUpdateSection({ id, name, features, active }, { secti
   return res;
 }
 
+export async function adminDeleteSection({ id }, { sectionsRepository, invalidate }) {
+  const sid = parseIntInRange(id, 1, 32767);
+  if (sid === null) throw new ValidationError('campo "id" non valido');
+  const res = await sectionsRepository.deleteSection({ id: sid });
+  invalidate();
+  return res;
+}
+
 export async function adminSetRanges({ id, ranges }, { sectionsRepository, invalidate }) {
   const sid = parseIntInRange(id, 1, 32767);
   if (sid === null) throw new ValidationError('campo "id" non valido');

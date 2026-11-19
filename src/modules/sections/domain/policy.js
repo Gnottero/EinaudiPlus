@@ -16,6 +16,7 @@ const perPermesso = makeAuthorize({
   laundryUpdate: P.SECTIONS_CONFIGURE,
   sectionCreate: P.SECTIONS_MANAGE,
   sectionSetRanges: P.SECTIONS_MANAGE,
+  sectionDelete: P.SECTIONS_MANAGE,
   laundryCreate: P.SECTIONS_MANAGE,
 });
 

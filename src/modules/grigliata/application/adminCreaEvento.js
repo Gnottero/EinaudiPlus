@@ -13,12 +13,15 @@
 
 import { requireSectionId } from "../../../shared/validation/section.js";
 import { ValidationError, fromRpcError } from "../../../shared/errors/AppError.js";
-import { isValidDate, controllaMenu, controllaQuota } from "../domain/validazione.js";
+import { isValidDate, controllaMenu, controllaQuota, TIPI_EVENTO as TIPI, MENU_TOMBOLATA } from "../domain/validazione.js";
 
 export async function adminCreaEvento(
-  { titolo, scadenza, giornoEvento, paypalLink, satispayLink, menu, pagamentiAttivi, quota, attore, sectionId },
+  { titolo, scadenza, giornoEvento, paypalLink, satispayLink, menu, pagamentiAttivi, quota, attore, sectionId, tipo },
   { grigliataRepository },
 ) {
+  const tipoEvento = tipo === undefined || tipo === null || tipo === "" ? "grigliata" : tipo;
+  if (!TIPI.includes(tipoEvento)) throw new ValidationError("tipo di evento non valido");
+
   // Può essere anche già passata: iscrizioni chiuse alla partenza, scheda
   // comunque visibile fino al giorno dopo la grigliata.
   if (!isValidDate(scadenza)) {
@@ -36,7 +39,9 @@ export async function adminCreaEvento(
     throw new ValidationError("inserisci almeno un link per il pagamento (PayPal o Satispay)");
   }
 
-  const esito = controllaMenu(menu);
+  // shortcut: la tombolata non ha menu né ticket, ma il flusso SQL li pretende: ne ha uno
+  // interno che l'app non mostra. Da rimuovere se un tipo avra' un menu proprio.
+  const esito = controllaMenu(tipoEvento === "tombolata" ? MENU_TOMBOLATA : menu);
   if (esito.errore) throw new ValidationError(esito.errore);
 
   // v1.4.1: facoltativa — vuota = nessuna quota indicata.
@@ -45,7 +50,7 @@ export async function adminCreaEvento(
 
   try {
     return await grigliataRepository.adminCrea({
-      titolo: String(titolo || "").trim() || "Grigliata",
+      titolo: String(titolo || "").trim() || (tipoEvento === "tombolata" ? "Tombolata" : "Grigliata"),
       scadenza: new Date(scadenza).toISOString(),
       // Un `date` puro (da <input type="date">, "AAAA-MM-GG"): nessuna
       // conversione, a differenza della scadenza non porta un orario.
@@ -57,7 +62,7 @@ export async function adminCreaEvento(
       menu: esito.menu.map(({ nome, ticket }) => ({ nome, ticket: ticket.map(({ nome, emoji }) => ({ nome, emoji })) })),
       pagamentiAttivi: pagamenti,
       quota: esitoQuota.quota,
-      attore, sectionId: requireSectionId(sectionId),
+      attore, sectionId: requireSectionId(sectionId), tipo: tipoEvento,
     });
   } catch (err) {
     // Vedi la stessa nota in linen-change/application/*.js: fromRpcError()

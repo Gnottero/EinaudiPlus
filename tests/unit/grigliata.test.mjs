@@ -340,6 +340,15 @@ section("adminCreaEvento()");
   check("una scadenza nel passato viene accettata", repoPassato.calls.length === 1
     && repoPassato.calls[0].args.scadenza === "2020-01-01T00:00:00.000Z");
 
+  // tipo di evento: la tombolata ha un menu interno, senza che l'admin ne scriva uno
+  const repoTomb = fakeRepository();
+  await adminCreaEvento({ sectionId: 1, titolo: "", tipo: "tombolata", scadenza: futuro, giornoEvento: GIORNO, pagamentiAttivi: false, menu: [], attore: "peach" },
+    { grigliataRepository: repoTomb });
+  check("tombolata: tipo, titolo di default e menu interno",
+    repoTomb.calls[0].args.tipo === "tombolata" && repoTomb.calls[0].args.titolo === "Tombolata" && repoTomb.calls[0].args.menu.length === 1);
+  const errTipo = await throws(() => adminCreaEvento({ sectionId: 1, titolo: "x", tipo: "bingo", scadenza: futuro, giornoEvento: GIORNO, menu: MENU, attore: "peach" }, { grigliataRepository: fakeRepository() }));
+  check("tipo sconosciuto respinto", errTipo?.message === "tipo di evento non valido");
+
   const errGiorno = await throws(() =>
     adminCreaEvento({ sectionId: 1, titolo: "x", scadenza: futuro, giornoEvento: "", paypalLink: "x", satispayLink: "", menu: MENU, attore: "peach" },
       { grigliataRepository: fakeRepository() }));

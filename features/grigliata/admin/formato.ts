@@ -12,10 +12,11 @@ const MESI = ["gennaio", "febbraio", "marzo", "aprile", "maggio", "giugno",
  *  dall'ultimo (e da quello prima ancora), invece del generico "Grigliata"
  *  ripetuto ogni volta. Resta un suggerimento: il campo titolo si può
  *  sempre riscrivere a mano. */
-export function titoloDaData(dataISO: string): string {
+export function titoloDaData(dataISO: string, tipo: "grigliata" | "tombolata" = "grigliata"): string {
+  const nome = tipo === "tombolata" ? "Tombolata" : "Grigliata";
   const d = new Date(dataISO);
-  if (Number.isNaN(d.getTime())) return "Grigliata";
-  return `Grigliata del ${d.getDate()} ${MESI[d.getMonth()]}`;
+  if (Number.isNaN(d.getTime())) return nome;
+  return `${nome} del ${d.getDate()} ${MESI[d.getMonth()]}`;
 }
 
 /** Il valore di default per il campo `<input type="datetime-local">`: fra

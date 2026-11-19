@@ -205,6 +205,7 @@ export default function GrigliataView({ lang, roomNumber }: { lang: Lang; roomNu
   }
 
   const { evento, miaAdesione } = stato;
+  const tomb = evento.tipo === "tombolata";
   // v1.4.1: la quota a persona, se il delegato l'ha indicata — vale anche
   // con i pagamenti spenti (quanto portare sul posto).
   const quota = evento.quota == null ? null
@@ -273,7 +274,7 @@ export default function GrigliataView({ lang, roomNumber }: { lang: Lang; roomNu
           i dati viaggiano come prima (stessa grigliata_iscrivi). */}
       {!iscrizioniAperte && !miaAdesione ? null : mostraForm ? (
         <div className="flex flex-col gap-4">
-          <div className="rounded-2xl border p-4" style={{ background: surf, borderColor: div }}>
+          {!tomb && <div className="rounded-2xl border p-4" style={{ background: surf, borderColor: div }}>
             <div>
               <p className="text-sm font-bold mb-3" style={{ color: fg }}>{t.menuLabel}</p>
               {/* Da uno a dieci menu, con nomi lunghi fino a 40 caratteri: una
@@ -297,15 +298,15 @@ export default function GrigliataView({ lang, roomNumber }: { lang: Lang; roomNu
                 })}
               </div>
             </div>
-          </div>
+          </div>}
 
           <div className="rounded-2xl border p-4 flex flex-col gap-4" style={{ background: surf, borderColor: div }}>
-            <div>
+            {!tomb && <div>
               <p className="text-sm font-bold" style={{ color: fg }}>{t.infoTitolo}</p>
               <p className="text-xs mt-0.5" style={{ color: sub }}>{t.infoDesc}</p>
-            </div>
+            </div>}
 
-            <div>
+            {!tomb && <div>
               <p className="text-sm font-semibold mb-2" style={{ color: fg }}>{t.dietaLabel}</p>
               {/* Tre pulsanti fissi, non legati ai menu del delegato: si può
                   scegliere QUALUNQUE menu e dichiararsi comunque vegani — è
@@ -324,11 +325,11 @@ export default function GrigliataView({ lang, roomNumber }: { lang: Lang; roomNu
                   );
                 })}
               </div>
-            </div>
+            </div>}
 
             {/* Un interruttore e non una quarta scelta di menu: si può essere
                 vegani E senza glutine, sono due cose indipendenti. */}
-            <button onClick={() => setSenzaGlutine((v) => !v)} role="switch" aria-checked={senzaGlutine}
+            {!tomb && <button onClick={() => setSenzaGlutine((v) => !v)} role="switch" aria-checked={senzaGlutine}
               className="flex items-center justify-between gap-3 text-left">
               <span>
                 <span className="block text-sm font-semibold" style={{ color: fg }}>{t.senzaGlutine}</span>
@@ -338,7 +339,7 @@ export default function GrigliataView({ lang, roomNumber }: { lang: Lang; roomNu
                 style={{ width: 44, height: 26, background: senzaGlutine ? RED : "var(--secondary)", justifyContent: senzaGlutine ? "flex-end" : "flex-start" }}>
                 <span className="rounded-full" style={{ width: 20, height: 20, background: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,.3)" }} />
               </span>
-            </button>
+            </button>}
 
             <label className="block">
               <span className="block text-sm font-semibold mb-2" style={{ color: fg }}>{t.noteLabel}</span>
@@ -368,11 +369,11 @@ export default function GrigliataView({ lang, roomNumber }: { lang: Lang; roomNu
               </button>
             )}
           </div>
-          <p className="text-xs" style={{ color: sub }}>
+          {!tomb && <p className="text-xs" style={{ color: sub }}>
             {t.menuScelto(nomeMenu(miaAdesione!.menuId))}
             {nomeDieta(miaAdesione!.dieta) && ` · ${nomeDieta(miaAdesione!.dieta)}`}
             {miaAdesione!.senzaGlutine && ` · ${t.senzaGlutine}`}
-          </p>
+          </p>}
           {miaAdesione!.note && (
             <p className="text-xs whitespace-pre-wrap" style={{ color: sub, overflowWrap: "anywhere" }}>
               {t.note}: {miaAdesione!.note}
@@ -446,7 +447,7 @@ export default function GrigliataView({ lang, roomNumber }: { lang: Lang; roomNu
           "Carne" = 🌭 Salsiccia + 🥤 Bibita). Compaiono appena il pagamento
           è confermato — prima del giorno della grigliata si vedono ma con
           lo slider bloccato. */}
-      {ticket.length > 0 && !modificaScelta && (
+      {!tomb && ticket.length > 0 && !modificaScelta && (
         <div className="mt-6 flex flex-col gap-3">
           <div className="flex items-end justify-between gap-3 px-1">
             <div className="flex items-center gap-2">

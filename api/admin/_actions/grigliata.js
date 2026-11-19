@@ -8,7 +8,7 @@ export const actions = {
     adminCreaEvento({
       titolo: body.titolo, scadenza: body.scadenza, giornoEvento: body.giorno_evento,
       paypalLink: body.paypal_link, satispayLink: body.satispay_link,
-      menu: body.menu, pagamentiAttivi: body.pagamenti_attivi, quota: body.quota, attore: me.u,
+      menu: body.menu, pagamentiAttivi: body.pagamenti_attivi, quota: body.quota, tipo: body.tipo, attore: me.u,
       sectionId: R,
     }),
   grigliataOverview: ({ R }) => grigliataAdminOverview(R),

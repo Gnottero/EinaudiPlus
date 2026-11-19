@@ -345,6 +345,8 @@ interface GrigliataEvento {
   paypalLink: string | null; satispayLink: string | null;
   /** Nell'ordine deciso dal delegato: il primo è quello "di base". */
   menu: GrigliataMenu[];
+  /** "grigliata" (menu e ticket) o "tombolata" (solo iscrizione e quota). Assente = grigliata. */
+  tipo: "grigliata" | "tombolata";
 }
 
 /** Indipendente dal menu scelto — si può scegliere "Carne" e dichiararsi
@@ -404,6 +406,7 @@ export async function getGrigliataStato(): Promise<GrigliataStato> {
       quota: data.evento.quota == null ? null : Number(data.evento.quota),
       paypalLink: data.evento.paypal_link ?? null, satispayLink: data.evento.satispay_link ?? null,
       menu: Array.isArray(data.evento.menu) ? data.evento.menu : [],
+      tipo: data.evento.tipo === "tombolata" ? "tombolata" : "grigliata",
     },
     miaAdesione: data.mia_adesione ? {
       menuId: Number(data.mia_adesione.menu_id),

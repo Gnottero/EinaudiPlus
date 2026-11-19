@@ -36,7 +36,7 @@ const RISORSE: { key: SharedKey; label: string }[] = [
   { key: "cinema", label: "Sala cinema" },
   { key: "music", label: "Sala musica" },
   { key: "conference", label: "Sala polivalente" },
-  { key: "grigliata", label: "Grigliata" },
+  { key: "grigliata", label: "Eventi (grigliata, tombolata)" },
 ];
 
 const HEX = /^#[0-9a-fA-F]{6}$/;
@@ -48,7 +48,7 @@ const FUNZIONI: { key: string; label: string }[] = [
   { key: "music", label: "Sala musica" },
   { key: "conference", label: "Sala polivalente" },
   { key: "bikes", label: "Bici" },
-  { key: "grigliata", label: "Grigliata" },
+  { key: "grigliata", label: "Eventi (grigliata, tombolata)" },
   { key: "feedback", label: "Segnalazioni" },
 ];
 
@@ -254,11 +254,21 @@ export function SezioniTab({ role }: { role: Role | null }) {
                     {s.active ? "Disattiva sezione" : "Riattiva sezione"}
                   </button>
                 )}
+                {superadmin && (
+                  <button style={{ ...S.btn, color: "var(--destructive-text)" }} disabled={busy}
+                    onClick={() => {
+                      // Irreversibile: sale, eventi, polivalente e intervalli della sezione spariscono. Meglio "Disattiva" se si vuole solo nasconderla.
+                      if (window.prompt(`Eliminare per sempre la sezione ${s.code} · ${s.name}? Si cancellano intervalli di camere, sale, eventi e polivalente. Scrivi ${s.code} per confermare.`) !== s.code) return;
+                      esegui(() => call("sectionDelete", { id: s.id }), "Sezione eliminata.");
+                    }}>
+                    Elimina sezione
+                  </button>
+                )}
               </div>
             </div>
 
             <div style={card}>
-              {titolo("Risorse proprie o condivise", "Di base ogni sezione ha le sue sale e la sua grigliata. Se ne condividi una, la sezione scelta ne è la proprietaria: usate la stessa e gli admin di entrambe la gestiscono.")}
+              {titolo("Risorse proprie o condivise", "Di base ogni sezione ha le sue sale e i suoi eventi (grigliata, tombolata). Se ne condividi una, la sezione scelta ne è la proprietaria: usate la stessa e gli admin di entrambe la gestiscono.")}
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 8 }}>
                 {RISORSE.map((r) => {
                   const altre = tutteLeSezioni.filter((x) => x.id !== s.id && x.active && !(x.shared_with?.[r.key]));

@@ -27,11 +27,11 @@ export const grigliataRepository = {
   },
 
   /** Admin (delegato/sistemista): fa partire una nuova grigliata, coi suoi menu. */
-  async adminCrea({ titolo, scadenza, giornoEvento, paypal, satispay, menu, pagamentiAttivi, quota, attore, sectionId }) {
+  async adminCrea({ titolo, scadenza, giornoEvento, paypal, satispay, menu, pagamentiAttivi, quota, attore, sectionId, tipo }) {
     return rpc("grigliata_admin_crea", {
       p_titolo: titolo, p_scadenza: scadenza, p_giorno_evento: giornoEvento,
       p_paypal: paypal, p_satispay: satispay, p_menu: menu, p_attore: attore,
-      p_pagamenti_attivi: pagamentiAttivi, p_quota: quota, p_section_id: sectionId,
+      p_pagamenti_attivi: pagamentiAttivi, p_quota: quota, p_section_id: sectionId, p_tipo: tipo,
     });
   },
 

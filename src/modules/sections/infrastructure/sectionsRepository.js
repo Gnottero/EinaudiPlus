@@ -11,6 +11,7 @@ export const sectionsRepository = {
   async updateSection({ id, name, features, active }) {
     return rpc("section_admin_update", { p_id: id, p_name: name, p_features: features, p_active: active });
   },
+  async deleteSection({ id }) { return rpc("section_admin_delete", { p_id: id }); },
   async setRanges({ id, ranges }) {
     return rpc("section_admin_set_ranges", { p_id: id, p_ranges: ranges });
   },

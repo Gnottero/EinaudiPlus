@@ -293,3 +293,15 @@ select _ok('cambio biancheria e tema: stesso proprietario per tutte le sezioni',
   resource_section((select id from section where code='Q'), 'linen') = (select min(id) from section)
   and resource_section((select id from section where code='Q'), 'theme') = (select min(id) from section)
   and resource_section((select id from section where code='Q'), 'cinema') = (select id from section where code='Q'));
+
+-- v2.2: tipo di evento e rimozione sezione
+select _ok('evento di default: tipo grigliata', (select tipo from grigliata_evento order by id limit 1) = 'grigliata');
+select _ok('tombolata creata', (grigliata_admin_crea('Tombolata Q', now() + interval '1 day', current_date + 2, null, null,
+  '[{"nome":"Tombolata","ticket":[{"nome":"Cartella"}]}]'::jsonb, 'x', false, null, (select id from section where code='Q'), 'tombolata')->>'ok')::boolean);
+select _ok('tipo esposto da overview', grigliata_admin_overview((select id from section where code='Q'))->'evento'->>'tipo' = 'tombolata');
+select _ok('tipo sconosciuto respinto', not (grigliata_admin_crea('x', now(), current_date, null, null, '[]'::jsonb, 'x', false, null, 1::smallint, 'bingo')->>'ok')::boolean);
+select _ok('la prima sezione non si elimina', not (section_admin_delete((select min(id) from section))->>'ok')::boolean);
+select _ok('elimina sezione senza account', (section_admin_delete((select id from section where code='Q'))->>'ok')::boolean);
+select _ok('eliminata con gli eventi a cascata', not exists (select 1 from section where code='Q')
+  and not exists (select 1 from grigliata_evento where titolo = 'Tombolata Q'));
+select _ok('anon non esegue section_admin_delete', not has_function_privilege('anon', 'section_admin_delete(smallint)', 'execute'));

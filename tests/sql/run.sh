@@ -24,6 +24,8 @@ q -q -1 < supabase/migrations/061-sezioni.sql >/dev/null
 q -q -1 < supabase/migrations/061-sezioni.sql >/dev/null   # idempotente
 q -q -1 < supabase/migrations/062-sezioni-ux.sql >/dev/null
 q -q -1 < supabase/migrations/062-sezioni-ux.sql >/dev/null   # idempotente
+q -q -1 < supabase/migrations/063-eventi-e-rimozione-sezione.sql >/dev/null
+q -q -1 < supabase/migrations/063-eventi-e-rimozione-sezione.sql >/dev/null   # idempotente
 q -t -c "select 'backfill: ' || (select string_agg(room, ',' order by id) from laundry_booking)" | grep -q "V112,V21-b,DIREZIONE" && echo "  ok    backfill V + DIREZIONE intatta"
 q -t -c "select 'bike: ' || (select string_agg(room, ',' order by room) from bike)" | grep -q "V007,V112" && echo "  ok    backfill bici"
 q -t -c "select 1 from space_booking where name = 'V112'" | grep -q 1 && echo "  ok    backfill nome sala = camera"

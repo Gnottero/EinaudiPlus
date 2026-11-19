@@ -41,8 +41,14 @@ export type Adesione = {
   ticket: AdesioneTicket[];
 };
 
+/** Tipologie di evento (grigliata_evento.tipo): la tombolata non ha menu né ticket. */
+export type TipoEvento = "grigliata" | "tombolata";
+export const NOME_TIPO: Record<TipoEvento, string> = { grigliata: "Grigliata", tombolata: "Tombolata" };
+
 export type Evento = {
   id: number; titolo: string; scadenza: string;
+  /** Assente se il server non ha ancora la migrazione 063: vale grigliata. */
+  tipo?: TipoEvento;
   // v1.4: il giorno VERO in cui si mangia — distinto dalla scadenza delle
   // adesioni/pagamenti, che può cadere prima.
   giorno_evento: string;

@@ -8,7 +8,7 @@ import { gruppiPresenti, pianoDi, nomePiano, colorePiano } from "../../../piani"
 import {
   NOME_DIETA, FILTRI_SOLO_CON_PAGAMENTI, haPagamento, haEsigenza,
   type Dieta, type Adesione, type Overview,
-  type FiltroEsigenza, type FiltroPagamento, type Raggruppa, type Scheda,
+  NOME_TIPO, type TipoEvento, type FiltroEsigenza, type FiltroPagamento, type Raggruppa, type Scheda,
 } from "./modello";
 import {
   titoloDaData, scadenzaDiDefault, isoInDatetimeLocal, fmtQuota, quotaInCampo,
@@ -79,6 +79,7 @@ export function GrigliataAdmin() {
   const [mostraForm, setMostraForm] = useState(false);
   const [titolo, setTitolo] = useState(titoloDaData(scadenzaDiDefault()));
   const [titoloModificato, setTitoloModificato] = useState(false);
+  const [tipoNuovo, setTipoNuovo] = useState<TipoEvento>("grigliata");
   const [scadenza, setScadenza] = useState(scadenzaDiDefault());
   const [giornoEvento, setGiornoEvento] = useState(giornoEventoDiDefault());
   const [paypal, setPaypal] = useState("");
@@ -136,7 +137,7 @@ export function GrigliataAdmin() {
   // scadenza per perdere un titolo che si era appena personalizzato.
   function cambiaScadenzaForm(v: string) {
     setScadenza(v);
-    if (!titoloModificato) setTitolo(titoloDaData(v));
+    if (!titoloModificato) setTitolo(titoloDaData(v, tipoNuovo));
   }
 
   async function creaEvento() {
@@ -146,15 +147,15 @@ export function GrigliataAdmin() {
       await call("grigliataCrea", {
         titolo, scadenza: new Date(scadenza).toISOString(), giorno_evento: giornoEvento,
         paypal_link: pagamentiNuovi ? paypal : "", satispay_link: pagamentiNuovi ? satispay : "",
-        menu: vociDaInviare(menuNuovi), pagamenti_attivi: pagamentiNuovi, quota: quotaNuova,
+        tipo: tipoNuovo, menu: tipoNuovo === "tombolata" ? [] : vociDaInviare(menuNuovi), pagamenti_attivi: pagamentiNuovi, quota: quotaNuova,
       });
       setMostraForm(false);
       setPaypal(""); setSatispay(""); setTitoloModificato(false);
-      setMenuNuovi(vociDiDefault()); setPagamentiNuovi(true); setQuotaNuova("");
+      setMenuNuovi(vociDiDefault()); setPagamentiNuovi(true); setQuotaNuova(""); setTipoNuovo("grigliata");
       setGiornoEvento(giornoEventoDiDefault());
       setFiltroMenu(null); setFiltroEsigenza("tutte"); setFiltroPagamento("tutti"); setCerca("");
       await carica();
-      setMsg("Grigliata avviata.");
+      setMsg(`${NOME_TIPO[tipoNuovo]} avviata.`);
     } catch (e: any) {
       setMsg("Non è riuscito: " + e.message);
     } finally {
@@ -384,6 +385,7 @@ export function GrigliataAdmin() {
   // Ogni adesione è già una camera che partecipa — non serve più filtrarle.
   const partecipanti = overview?.adesioni ?? [];
 
+  const tomb = evento?.tipo === "tombolata";
   const menuEvento = evento?.menu ?? [];
   const idMenuDefault = menuEvento[0]?.id ?? null;
   const nomeMenu = (id: number) => menuEvento.find((m) => m.id === id)?.nome ?? "?";
@@ -425,7 +427,7 @@ export function GrigliataAdmin() {
   const eGiornoEvento = evento != null && evento.giorno_evento <= oggiISO();
   // Il giorno della grigliata si apre direttamente sui ticket, gli altri
   // giorni su chi partecipa — finché il delegato non sceglie lui.
-  const schedaAttiva: Scheda = scheda ?? (eGiornoEvento ? "giorno" : "partecipanti");  const perMenu = (id: number) => {
+  const schedaAttiva: Scheda = scheda ?? (eGiornoEvento && !tomb ? "giorno" : "partecipanti");  const perMenu = (id: number) => {
     const del = partecipanti.filter((a) => a.menu_id === id);
     return { totale: del.length, pagati: del.filter((a) => a.pagamento_confermato).length };
   };
@@ -619,8 +621,8 @@ export function GrigliataAdmin() {
           allineato tutto a destra, lasciava uno spazio vuoto grande quanto
           la larghezza della pagina. */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, marginBottom: 16 }}>
-        <h2 style={{ fontSize: 18, fontWeight: 800 }}>Grigliata</h2>
-        <button onClick={() => { setMostraForm(true); setScheda("impostazioni"); }} title="Fai partire una nuova grigliata"
+        <h2 style={{ fontSize: 18, fontWeight: 800 }}>Eventi</h2>
+        <button onClick={() => { setMostraForm(true); setScheda("impostazioni"); }} title="Fai partire un nuovo evento"
           style={{
             width: 34, height: 34, borderRadius: 99, flexShrink: 0,
             display: "flex", alignItems: "center", justifyContent: "center",
@@ -640,7 +642,7 @@ export function GrigliataAdmin() {
             ["giorno", "Ticket", Ticket],
             ["partecipanti", "Partecipanti", Users],
             ["impostazioni", "Impostazioni", Settings],
-          ] as [Scheda, string, typeof Settings][]).map(([id, label, Icona]) => {
+          ] as [Scheda, string, typeof Settings][]).filter(([id]) => !(tomb && id === "giorno")).map(([id, label, Icona]) => {
             const attiva = schedaAttiva === id;
             return (
               <button key={id} role="tab" aria-selected={attiva} onClick={() => setScheda(id)}
@@ -672,10 +674,23 @@ export function GrigliataAdmin() {
           )}
 
           <div>
+            <label style={{ fontSize: 12, ...S.sub, display: "block", marginBottom: 4 }}>Tipo di evento</label>
+            <div style={{ display: "flex", gap: 6 }}>
+              {(Object.keys(NOME_TIPO) as TipoEvento[]).map((t) => (
+                <button key={t} type="button" aria-pressed={tipoNuovo === t}
+                  onClick={() => { setTipoNuovo(t); if (!titoloModificato) setTitolo(titoloDaData(scadenza, t)); }}
+                  style={{ ...S.btn, flex: 1, opacity: tipoNuovo === t ? 1 : 0.55, fontWeight: tipoNuovo === t ? 800 : 600 }}>
+                  {NOME_TIPO[t]}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
             <label style={{ fontSize: 12, ...S.sub, display: "block", marginBottom: 4 }}>Titolo</label>
             <input style={S.input} value={titolo}
               onChange={(e) => { setTitolo(e.target.value); setTitoloModificato(true); }}
-              placeholder="Grigliata" />
+              placeholder={NOME_TIPO[tipoNuovo]} />
           </div>
 
           <div>
@@ -687,7 +702,7 @@ export function GrigliataAdmin() {
           </div>
 
           <div>
-            <label style={{ fontSize: 12, ...S.sub, display: "block", marginBottom: 4 }}>Giorno della grigliata</label>
+            <label style={{ fontSize: 12, ...S.sub, display: "block", marginBottom: 4 }}>Giorno dell'evento</label>
             <input style={S.input} type="date" value={giornoEvento} onChange={(e) => setGiornoEvento(e.target.value)} />
             <p style={{ fontSize: 11, ...S.sub, marginTop: 4 }}>
               Il giorno vero in cui si mangia — può cadere dopo la fine delle iscrizioni.
@@ -696,7 +711,7 @@ export function GrigliataAdmin() {
             </p>
           </div>
 
-          <EditorMenu voci={menuNuovi} onChange={setMenuNuovi} />
+          {tipoNuovo === "grigliata" && <EditorMenu voci={menuNuovi} onChange={setMenuNuovi} />}
 
           <div>
             <label style={{ fontSize: 12, ...S.sub, display: "block", marginBottom: 4 }}>Quota a persona (€, facoltativa)</label>
@@ -756,7 +771,7 @@ export function GrigliataAdmin() {
                 <input style={S.input} value={nuovaQuota} onChange={(e) => setNuovaQuota(e.target.value)}
                   inputMode="decimal" placeholder="Es. 10 oppure 12,50" />
               </div>
-              <div style={{ marginTop: 4 }}>
+              <div style={{ marginTop: 4, display: tomb ? "none" : undefined }}>
                 <EditorMenu voci={menuModifica} onChange={setMenuModifica} scelte={scelteDi} ticketScelte={ticketScelteDi} />
               </div>
               <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
@@ -1039,6 +1054,7 @@ export function GrigliataAdmin() {
             }}>
               <input style={{ ...S.input, width: "auto", flex: 1, minWidth: 90 }} placeholder="Camera"
                 value={nuovaCamera} onChange={(e) => scriviCamera(e.target.value)} />
+              {!tomb && <>
               <select style={{ ...S.input, width: "auto", maxWidth: "100%" }} value={menuCameraEffettivo ?? ""}
                 onChange={(e) => setNuovoMenuCamera(Number(e.target.value))}>
                 {menuEvento.map((m) => <option key={m.id} value={m.id}>{m.nome}</option>)}
@@ -1053,6 +1069,7 @@ export function GrigliataAdmin() {
                 <input type="checkbox" checked={nuovoGlutineCamera} onChange={(e) => setNuovoGlutineCamera(e.target.checked)} />
                 <WheatOff size={13} /> Senza glutine
               </label>
+              </>}
               {cameraGiaIscritta && (
                 <p style={{ flexBasis: "100%", fontSize: 11, ...S.sub }}>
                   La camera {cameraGiaIscritta.room} ha già risposto: le sue scelte vengono aggiornate.
@@ -1091,7 +1108,7 @@ export function GrigliataAdmin() {
                 </div>
               )}
 
-              <div style={{ display: "flex", gap: 6, overflowX: "auto", alignItems: "center" }}>
+              {!tomb && <div style={{ display: "flex", gap: 6, overflowX: "auto", alignItems: "center" }}>
                 <span style={{ fontSize: 11, ...S.sub, flexShrink: 0, width: 58 }}>Esigenze</span>
                 {([
                   ["tutte", "Tutte"],
@@ -1108,7 +1125,7 @@ export function GrigliataAdmin() {
                     {label}
                   </Filtro>
                 ))}
-              </div>
+              </div>}
 
               <div style={{ display: "flex", gap: 6, overflowX: "auto", alignItems: "center" }}>
                   <span style={{ fontSize: 11, ...S.sub, flexShrink: 0, width: 58 }}>Pagamento</span>
@@ -1132,7 +1149,7 @@ export function GrigliataAdmin() {
               <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
                 <span style={{ fontSize: 11, ...S.sub, flexShrink: 0, width: 58 }}>Raggruppa</span>
                 <Filtro attivo={raggruppa === "piano"} onClick={() => setRaggruppa("piano")}>Per piano</Filtro>
-                <Filtro attivo={raggruppa === "menu"} onClick={() => setRaggruppa("menu")}>Per menu</Filtro>
+                {!tomb && <Filtro attivo={raggruppa === "menu"} onClick={() => setRaggruppa("menu")}>Per menu</Filtro>}
                 {filtriAttivi && (
                   <span style={{ marginLeft: "auto", fontSize: 12, ...S.sub }}>
                     {filtrati.length} di {partecipanti.length} ·{" "}

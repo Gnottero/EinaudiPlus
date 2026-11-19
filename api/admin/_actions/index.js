@@ -45,7 +45,7 @@ export const MUTATIONS = new Set([
   "conferenzaAdd", "conferenzaUpdate", "conferenzaDelete",
   "conferenzaSkip", "conferenzaMove", "conferenzaResetOccorrenza",
   "accountCreate", "accountSetPassword", "accountSetActive", "accountDelete", "accountSetCamera", "accountSetSection",
-  "sectionCreate", "sectionUpdate", "sectionSetRanges", "sectionSetSharing", "sectionSetRangeStyle", "laundryCreate", "laundryUpdate",
+  "sectionCreate", "sectionDelete", "sectionUpdate", "sectionSetRanges", "sectionSetSharing", "sectionSetRangeStyle", "laundryCreate", "laundryUpdate",
   "accountChangeOwnPassword", "biciPurge", "biciDeleteRoom", "biciAddRoom", "temaSet",
   "cambioBiancheriaSet", "cambioBiancheriaSkip",
   "grigliataCrea", "grigliataConfermaPagamento", "grigliataAnnullaConfermaPagamento", "grigliataChiudi", "grigliataModifica",

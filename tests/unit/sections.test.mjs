@@ -116,6 +116,7 @@ await adminUpdateLaundry({ id: 3, pairs: 3 }, adm);
 check("update lavanderia: nome non dato = null", calls.at(-1).args.name === null && calls.at(-1).args.pairs === 3);
 
 section("authorize()");
+check("solo il superadmin elimina sezioni", authorize({ r: "superadmin" }, "sectionDelete") === true && authorize({ r: "admin" }, "sectionDelete") === false);
 check("solo il superadmin crea sezioni", authorize({ r: "superadmin" }, "sectionCreate") === true && authorize({ r: "admin" }, "sectionCreate") === false);
 check("solo il superadmin cambia gli intervalli e crea lavanderie", authorize({ r: "admin" }, "sectionSetRanges") === false && authorize({ r: "admin" }, "laundryCreate") === false);
 check("l'admin modifica funzioni, condivisioni e colori", ["sectionUpdate", "sectionSetSharing", "sectionSetRangeStyle", "laundryUpdate"].every((a) => authorize({ r: "admin" }, a) === true));

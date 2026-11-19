@@ -20,7 +20,7 @@ import {
   adminCreateSection as _adminCreateSection, adminUpdateSection as _adminUpdateSection,
   adminSetRanges as _adminSetRanges, adminCreateLaundry as _adminCreateLaundry,
   adminUpdateLaundry as _adminUpdateLaundry, adminSetSharing as _adminSetSharing,
-  adminSetRangeStyle as _adminSetRangeStyle,
+  adminSetRangeStyle as _adminSetRangeStyle, adminDeleteSection as _adminDeleteSection,
 } from "./application/adminSections.js";
 
 export { authorize } from "./domain/policy.js";
@@ -58,6 +58,7 @@ export const resolveResourceSection = (input) => _resolveResourceSection(input, 
 
 export const adminCreateSection = (input) => _adminCreateSection(input, deps);
 export const adminUpdateSection = (input) => _adminUpdateSection(input, deps);
+export const adminDeleteSection = (input) => _adminDeleteSection(input, deps);
 export const adminSetRanges = (input) => _adminSetRanges(input, deps);
 export const adminCreateLaundry = (input) => _adminCreateLaundry(input, deps);
 export const adminUpdateLaundry = (input) => _adminUpdateLaundry(input, deps);

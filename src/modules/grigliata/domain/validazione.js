@@ -154,3 +154,8 @@ export function controllaQuota(v) {
   if (n > QUOTA_MAX) return { errore: `quota non valida (massimo ${QUOTA_MAX} €)` };
   return { quota: Math.round(n * 100) / 100 };
 }
+
+/** Le tipologie di evento (grigliata_evento.tipo): tieni allineato il CHECK in SQL. */
+export const TIPI_EVENTO = Object.freeze(["grigliata", "tombolata"]);
+/** Il menu interno di una tombolata (vedi adminCreaEvento): una voce, mai mostrata. */
+export const MENU_TOMBOLATA = [{ nome: "Tombolata", ticket: [{ nome: "Cartella" }] }];

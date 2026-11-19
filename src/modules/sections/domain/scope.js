@@ -80,7 +80,7 @@ export const REGOLE = Object.freeze({
   deletePushSub: [{ byId: ["push_sub"], field: "id" }], deleteTelegramSub: [{ byId: ["telegram_sub"], field: "id" }],
   // — sezioni —
   sectionUpdate: ["section"], sectionSetSharing: ["section"], sectionSetRangeStyle: ["range"],
-  sectionCreate: ["any"], sectionSetRanges: ["any"], laundryCreate: ["any"],
+  sectionCreate: ["any"], sectionDelete: ["any"], sectionSetRanges: ["any"], laundryCreate: ["any"],
   // — account (regole fini in data.js) —
   accountList: ["account"], accountCreate: ["account"], accountSetPassword: ["account"], accountSetActive: ["account"],
   accountDelete: ["account"], accountSetCamera: ["account"], accountSetSection: ["account"],
