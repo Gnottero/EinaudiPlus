@@ -75,7 +75,7 @@ alter table section_range enable row level security;
 -- ─────────────────────────────────────────────────────────────────────────────
 
 alter table laundry add column if not exists n_pairs smallint not null default 3
-  check (n_pairs between 1 and 3);
+  check (n_pairs between 1 and 8);
 
 -- La Manica ha una sola coppia. Era implicito in machine.bookable: ora e' un
 -- dato della lavanderia, da cui machine.bookable discende.
@@ -267,18 +267,17 @@ declare
   v_r  jsonb;
 begin
   insert into section (code, number, name, features)
-  values (upper(btrim(p_code)), p_number, btrim(p_name), coalesce(p_features, '{}'::jsonb))
+  values (upper(btrim(p_code)),
+          coalesce(p_number, (select coalesce(max(number), 0) + 1 from section)::smallint),
+          btrim(p_name), coalesce(p_features, '{}'::jsonb))
   returning id into v_id;
 
-  -- Ogni sezione ha le sue sale (cinema, musica): indipendenti da quelle delle
-  -- altre finche' non si sceglie di condividerle (section_admin_set_sharing).
   insert into room_space (slug, name, has_type, open_min, close_min, section_id)
   values ('cinema', 'Sala Cinema', true, 0, 1440, v_id),
          ('music',  'Sala Musica', false, 0, 1440, v_id);
 
   v_r := section_admin_set_ranges(v_id, coalesce(p_ranges, '[]'::jsonb));
   if not (v_r->>'ok')::boolean then
-    -- Tutto o niente: una sezione senza intervalli validi non si crea a meta'.
     raise exception 'ranges: %', v_r->>'error';
   end if;
 
@@ -317,7 +316,16 @@ $$;
 -- oltre il conto restano nella tabella (client e funzioni indicizzano sempre
 -- A-C) ma non prenotabili e segnate fuori servizio, come faceva la Manica.
 create or replace function laundry_apply_pairs(p_laundry_id smallint)
-returns void language sql as $$
+returns void language plpgsql as $$
+begin
+  insert into machine (laundry_id, code, kind, bookable, is_oos, sort_order)
+  select l.id, k.prefix || '-' || chr(64 + g), k.kind, true, false, k.base + g
+  from laundry l
+  cross join generate_series(1, l.n_pairs) g
+  cross join (values ('W','washer',0), ('D','dryer',10)) as k(prefix, kind, base)
+  where l.id = p_laundry_id
+  on conflict (laundry_id, code) do nothing;
+
   update machine m
   set bookable   = (ascii(substring(m.code from 3 for 1)) - 64) <= l.n_pairs,
       is_oos     = case when (ascii(substring(m.code from 3 for 1)) - 64) <= l.n_pairs
@@ -326,6 +334,7 @@ returns void language sql as $$
       updated_at = now()
   from laundry l
   where l.id = p_laundry_id and m.laundry_id = l.id;
+end;
 $$;
 
 create or replace function laundry_admin_create(p_slug text, p_name text, p_pairs smallint)
@@ -335,14 +344,6 @@ begin
   insert into laundry (slug, name, reminder_mode, n_pairs)
   values (lower(btrim(p_slug)), btrim(p_name), 'triple', p_pairs)
   returning id into v_id;
-
-  insert into machine (laundry_id, code, kind, bookable, is_oos, sort_order)
-  select v_id, m.code, m.kind, true, false, m.ord
-  from (values
-    ('W-A','washer',1), ('W-B','washer',2), ('W-C','washer',3),
-    ('D-A','dryer', 4), ('D-B','dryer', 5), ('D-C','dryer', 6)
-  ) as m(code, kind, ord);
-
   perform laundry_apply_pairs(v_id);
   return jsonb_build_object('ok', true, 'id', v_id);
 exception
@@ -699,9 +700,12 @@ $$;
 
 create or replace function resource_section(p_section smallint, p_feature text)
 returns smallint language sql stable as $$
-  select coalesce(
-    (select nullif(s.shared_with->>p_feature, '')::smallint from section s where s.id = p_section),
-    p_section);
+  select case
+    when p_feature in ('linen', 'theme') then (select min(id) from section)
+    else coalesce(
+      (select nullif(s.shared_with->>p_feature, '')::smallint from section s where s.id = p_section),
+      p_section)
+  end;
 $$;
 
 -- Chi puo' agire su una risorsa esistente? Il suo proprietario e le sezioni

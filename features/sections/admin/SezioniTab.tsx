@@ -31,9 +31,7 @@ const RISORSE: { key: SharedKey; label: string }[] = [
   { key: "cinema", label: "Sala cinema" },
   { key: "music", label: "Sala musica" },
   { key: "conference", label: "Sala polivalente" },
-  { key: "linen", label: "Cambio biancheria" },
   { key: "grigliata", label: "Grigliata" },
-  { key: "theme", label: "Tema stagionale" },
 ];
 
 const HEX = /^#[0-9a-fA-F]{6}$/;
@@ -45,48 +43,90 @@ const FUNZIONI: { key: string; label: string }[] = [
   { key: "music", label: "Sala musica" },
   { key: "conference", label: "Sala polivalente" },
   { key: "bikes", label: "Bici" },
-  { key: "linen", label: "Cambio biancheria" },
   { key: "grigliata", label: "Grigliata" },
   { key: "feedback", label: "Segnalazioni" },
-  { key: "notifications", label: "Notifiche (push e Telegram)" },
-  { key: "theme", label: "Tema stagionale" },
 ];
+
+// Comuni a tutto il collegio: non si accendono ne' si spengono per sezione.
+const NOTA_COMUNI = "Notifiche (push e Telegram), cambio biancheria e tema stagionale sono comuni a tutte le sezioni: sempre attivi, non si configurano qui.";
+
+const PALETTE = ["#f97316", "#eab308", "#22c55e", "#3b82f6", "#a855f7", "#ec4899", "#14b8a6", "#ef4444"];
+const MAX_COPPIE = 8;
+
+/** Contatore - / N / + (niente select a 3 voci: si sceglie qualunque numero). */
+function Contatore({ valore, onChange, min = 1, max = MAX_COPPIE }: { valore: number; onChange: (n: number) => void; min?: number; max?: number }) {
+  const bt = { ...S.btn, width: 36, padding: 0 } as const;
+  return (
+    <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+      <button type="button" style={bt} aria-label="Meno" disabled={valore <= min} onClick={() => onChange(valore - 1)}>−</button>
+      <input style={{ ...S.input, width: 56, textAlign: "center" }} inputMode="numeric" aria-label="Numero di coppie" value={valore}
+             onChange={(e) => { const n = Number(e.target.value.replace(/\D/g, "")); if (n >= min && n <= max) onChange(n); }} />
+      <button type="button" style={bt} aria-label="Piu'" disabled={valore >= max} onClick={() => onChange(valore + 1)}>+</button>
+    </span>
+  );
+}
+
+const testoMacchine = (n: number) => `${n} ${n === 1 ? "lavatrice" : "lavatrici"} + ${n} ${n === 1 ? "asciugatrice" : "asciugatrici"}`;
+
+const Campo = ({ nome, children, stile }: { nome: string; children: React.ReactNode; stile?: React.CSSProperties }) => (
+  <label style={{ display: "grid", gap: 2, fontSize: 11, ...S.sub, ...stile }}>{nome}{children}</label>
+);
 
 const acceso = (f: Record<string, boolean>, k: string) => f?.[k] !== false;
 const primario = { ...S.btn, background: "var(--primary)", color: "var(--primary-foreground)", borderColor: "transparent" } as const;
 
-/** Editor di un elenco di intervalli di camere, ognuno con la sua lavanderia. */
+/** Editor dei piani / gruppi di camere di una sezione, ognuno con la sua lavanderia. */
 function Intervalli({ valore, onChange, lavanderie, disabled }: {
   valore: Range[]; onChange: (r: Range[]) => void; lavanderie: Lavanderia[]; disabled?: boolean;
 }) {
   const set = (i: number, patch: Partial<Range>) => onChange(valore.map((r, j) => (j === i ? { ...r, ...patch } : r)));
-  const num = (v: string): number | "" => (v === "" ? "" : Number(v));
+  const num = (v: string): number | "" => (v === "" ? "" : Number(v.replace(/\D/g, "")));
+  // Il nuovo piano parte dove finisce l'ultimo: +100 se i piani sono a centinaia (101-136 -> 201-236), altrimenti subito dopo.
+  const aggiungi = () => {
+    const ult = valore[valore.length - 1];
+    const f = Number(ult?.from), t = Number(ult?.to);
+    const passo = f >= 100 && t >= f ? 100 : 0;
+    const da = !ult || !f || !t ? "" : passo ? f + passo : t + 1;
+    const a = !ult || !f || !t ? "" : passo ? t + passo : t + 1 + (t - f);
+    onChange([...valore, {
+      label: `Piano ${valore.length + 1}`, from: da, to: a,
+      laundry_id: ult ? ult.laundry_id : lavanderie[0]?.id ?? null, color: PALETTE[valore.length % PALETTE.length],
+    }]);
+  };
   return (
-    <div style={{ display: "grid", gap: 6 }}>
+    <div style={{ display: "grid", gap: 10 }}>
+      {valore.length === 0 && <p style={{ fontSize: 12, ...S.sub }}>Nessun piano ancora: aggiungine uno per dire quali camere fanno parte della sezione.</p>}
       {valore.map((r, i) => (
-        <div key={i} className="adm-form">
-          <input style={S.input} placeholder="Nome (es. Manica)" value={r.label} maxLength={40} disabled={disabled}
-                 onChange={(e) => set(i, { label: e.target.value })} />
-          <input style={{ ...S.input, maxWidth: 90 }} inputMode="numeric" placeholder="Da" value={r.from} disabled={disabled}
-                 onChange={(e) => set(i, { from: num(e.target.value) })} />
-          <input style={{ ...S.input, maxWidth: 90 }} inputMode="numeric" placeholder="A" value={r.to} disabled={disabled}
-                 onChange={(e) => set(i, { to: num(e.target.value) })} />
-          <input type="color" aria-label="Colore" value={r.color && HEX.test(r.color) ? r.color : "#999999"} disabled={disabled}
-                 style={{ width: 40, height: 38, padding: 2, border: "1px solid var(--border)", borderRadius: 8, background: "var(--background)" }}
-                 onChange={(e) => set(i, { color: e.target.value })} />
-          <select style={S.input} value={r.laundry_id ?? ""} disabled={disabled}
-                  onChange={(e) => set(i, { laundry_id: e.target.value === "" ? null : Number(e.target.value) })}>
-            <option value="">Nessuna lavanderia</option>
-            {lavanderie.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
-          </select>
+        <div key={i} className="adm-form" style={{ alignItems: "end" }}>
+          <Campo nome="Nome (piano, edificio)" stile={{ flex: 1, minWidth: 140 }}>
+            <input style={S.input} placeholder="es. 1° piano" value={r.label} maxLength={40} disabled={disabled}
+                   onChange={(e) => set(i, { label: e.target.value })} />
+          </Campo>
+          <Campo nome="Dalla camera" stile={{ maxWidth: 90 }}>
+            <input style={S.input} inputMode="numeric" placeholder="101" value={r.from} disabled={disabled}
+                   onChange={(e) => set(i, { from: num(e.target.value) })} />
+          </Campo>
+          <Campo nome="Alla camera" stile={{ maxWidth: 90 }}>
+            <input style={S.input} inputMode="numeric" placeholder="136" value={r.to} disabled={disabled}
+                   onChange={(e) => set(i, { to: num(e.target.value) })} />
+          </Campo>
+          <Campo nome="Colore">
+            <input type="color" aria-label="Colore" value={r.color && HEX.test(r.color) ? r.color : "#999999"} disabled={disabled}
+                   style={{ width: 40, height: 38, padding: 2, border: "1px solid var(--border)", borderRadius: 8, background: "var(--background)" }}
+                   onChange={(e) => set(i, { color: e.target.value })} />
+          </Campo>
+          <Campo nome="Lavanderia" stile={{ minWidth: 150 }}>
+            <select style={S.input} value={r.laundry_id ?? ""} disabled={disabled}
+                    onChange={(e) => set(i, { laundry_id: e.target.value === "" ? null : Number(e.target.value) })}>
+              <option value="">Nessuna lavanderia</option>
+              {lavanderie.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
+            </select>
+          </Campo>
           {!disabled && <button type="button" style={S.danger} onClick={() => onChange(valore.filter((_, j) => j !== i))}>Togli</button>}
         </div>
       ))}
       {!disabled && (
-        <div><button type="button" style={S.btn}
-          onClick={() => onChange([...valore, { label: "", from: "", to: "", laundry_id: lavanderie[0]?.id ?? null }])}>
-          + Intervallo
-        </button></div>
+        <div><button type="button" style={S.btn} onClick={aggiungi}>+ Aggiungi piano</button></div>
       )}
     </div>
   );
@@ -114,8 +154,8 @@ export function SezioniTab({ role }: { role: Role | null }) {
   const [bozzaLav, setBozzaLav] = useState<Record<number, { name: string; pairs: number }>>({});
 
   // Nuova sezione / nuova lavanderia (solo superadmin).
-  const [nuova, setNuova] = useState<{ code: string; number: string; name: string; features: Record<string, boolean>; ranges: Range[] }>(
-    { code: "", number: "", name: "", features: {}, ranges: [] });
+  const [nuova, setNuova] = useState<{ code: string; name: string; features: Record<string, boolean>; ranges: Range[] }>(
+    { code: "", name: "", features: {}, ranges: [] });
   const [nuovaLav, setNuovaLav] = useState({ slug: "", name: "", pairs: 2 });
 
   const load = useCallback(async () => {
@@ -148,9 +188,9 @@ export function SezioniTab({ role }: { role: Role | null }) {
   return (
     <>
       <p style={{ fontSize: 13, ...S.sub, marginBottom: 16 }}>
-        Ogni sezione ha una lettera con cui i residenti entrano (V112, P21-b), delle funzioni accese o
-        spente, e degli intervalli di camere ognuno con la sua lavanderia. Due sezioni possono usare
-        la stessa lavanderia.
+        Una sezione e' un gruppo di camere con la stessa lettera (V112, P21-b). Per ognuna scegli quali
+        funzioni sono attive, quali risorse sono sue o condivise, e i piani con la lavanderia che usano.
+        Due sezioni possono usare la stessa lavanderia. {NOTA_COMUNI}
       </p>
       {msg && <div style={{ ...S.card, padding: 12, marginBottom: 16, fontSize: 13 }}>{msg}</div>}
 
@@ -196,8 +236,7 @@ export function SezioniTab({ role }: { role: Role | null }) {
               Salva funzioni
             </button>
             <p style={{ fontSize: 12, ...S.sub, marginTop: 6 }}>
-              Una funzione spenta sparisce per chi abita in questa sezione. Sale comuni, sala polivalente,
-              cambio biancheria e grigliata sono risorse di tutto il collegio: qui si decide solo chi le vede.
+              Una funzione spenta sparisce per chi abita in questa sezione. {NOTA_COMUNI}
             </p>
 
             <h3 style={{ fontSize: 13, fontWeight: 700, margin: "16px 0 8px" }}>Risorse: proprie o condivise</h3>
@@ -238,7 +277,7 @@ export function SezioniTab({ role }: { role: Role | null }) {
               );
             })()}
 
-            <h3 style={{ fontSize: 13, fontWeight: 700, margin: "16px 0 8px" }}>Intervalli di camere</h3>
+            <h3 style={{ fontSize: 13, fontWeight: 700, margin: "16px 0 8px" }}>Piani e camere</h3>
             {!superadmin && (
               <>
                 <p style={{ fontSize: 12, ...S.sub, marginBottom: 8 }}>
@@ -274,11 +313,11 @@ export function SezioniTab({ role }: { role: Role | null }) {
                         onChange={(r) => setBozzaRanges({ ...bozzaRanges, [s.id]: r })} />}
             {superadmin && (
               <button style={bozzaRanges[s.id] ? { ...primario, marginTop: 8 } : { ...S.btn, marginTop: 8 }} disabled={busy || !bozzaRanges[s.id]}
-                onClick={() => esegui(() => call("sectionSetRanges", { id: s.id, ranges: rangesPerServer(bozzaRanges[s.id]) }), "Intervalli salvati.")}>
-                Salva intervalli
+                onClick={() => esegui(() => call("sectionSetRanges", { id: s.id, ranges: rangesPerServer(bozzaRanges[s.id]) }), "Piani salvati.")}>
+                Salva piani
               </button>
             )}
-            {!superadmin && <p style={{ fontSize: 12, ...S.sub, marginTop: 6 }}>I numeri degli intervalli li modifica un superadmin.</p>}
+            {!superadmin && <p style={{ fontSize: 12, ...S.sub, marginTop: 6 }}>Aggiungere o cambiare i numeri dei piani lo fa un superadmin.</p>}
           </div>
         );
       })}
@@ -295,10 +334,8 @@ export function SezioniTab({ role }: { role: Role | null }) {
               <div key={l.id} className="adm-form">
                 <input style={S.input} value={b.name} maxLength={60}
                        onChange={(e) => setBozzaLav({ ...bozzaLav, [l.id]: { ...b, name: e.target.value } })} />
-                <select style={{ ...S.input, maxWidth: 150 }} value={b.pairs}
-                        onChange={(e) => setBozzaLav({ ...bozzaLav, [l.id]: { ...b, pairs: Number(e.target.value) } })}>
-                  {[1, 2, 3].map((n) => <option key={n} value={n}>{n} {n === 1 ? "coppia" : "coppie"}</option>)}
-                </select>
+                <Contatore valore={b.pairs} onChange={(n) => setBozzaLav({ ...bozzaLav, [l.id]: { ...b, pairs: n } })} />
+                <span style={{ fontSize: 12, ...S.sub }}>{testoMacchine(b.pairs)}</span>
                 <button style={sporca ? primario : S.btn} disabled={busy || !sporca}
                   onClick={() => esegui(() => call("laundryUpdate", { id: l.id, name: b.name, pairs: b.pairs }), "Lavanderia salvata.")}>
                   Salva
@@ -307,7 +344,7 @@ export function SezioniTab({ role }: { role: Role | null }) {
                   {condivisa.length === 0 ? "Non usata da nessuna sezione"
                     : condivisa.length === 1 ? `Usata da ${condivisa[0].code}`
                     : `Condivisa fra ${condivisa.map((x) => x.code).join(" e ")}`}
-                  {" · "}ogni lavatrice prenota in automatico l'asciugatrice con la stessa lettera
+                  {" · "}da 1 a 8 coppie; la lavatrice A prenota in automatico l'asciugatrice A, e cosi' via
                 </span>
               </div>
             );
@@ -321,10 +358,8 @@ export function SezioniTab({ role }: { role: Role | null }) {
                      onChange={(e) => setNuovaLav({ ...nuovaLav, slug: e.target.value })} />
               <input style={S.input} placeholder="Nome" value={nuovaLav.name} maxLength={60}
                      onChange={(e) => setNuovaLav({ ...nuovaLav, name: e.target.value })} />
-              <select style={{ ...S.input, maxWidth: 150 }} value={nuovaLav.pairs}
-                      onChange={(e) => setNuovaLav({ ...nuovaLav, pairs: Number(e.target.value) })}>
-                {[1, 2, 3].map((n) => <option key={n} value={n}>{n} {n === 1 ? "coppia" : "coppie"}</option>)}
-              </select>
+              <Contatore valore={nuovaLav.pairs} onChange={(n) => setNuovaLav({ ...nuovaLav, pairs: n })} />
+              <span style={{ fontSize: 12, ...S.sub }}>{testoMacchine(nuovaLav.pairs)}</span>
               <button style={primario} disabled={busy}
                 onClick={() => esegui(async () => { await call("laundryCreate", nuovaLav); setNuovaLav({ slug: "", name: "", pairs: 2 }); }, "Lavanderia creata.")}>
                 Crea
@@ -336,12 +371,13 @@ export function SezioniTab({ role }: { role: Role | null }) {
 
       {superadmin && (
         <div style={{ ...S.card, padding: 18 }}>
-          <h2 style={{ fontSize: 15, fontWeight: 700, marginBottom: 12 }}>Nuova sezione</h2>
+          <h2 style={{ fontSize: 15, fontWeight: 700, marginBottom: 4 }}>Nuova sezione</h2>
+          <p style={{ fontSize: 12, ...S.sub, marginBottom: 12 }}>
+            Il numero di sezione e' automatico (il prossimo libero). Se la sezione ha una lavanderia nuova, creala prima qui sopra.
+          </p>
           <div className="adm-form" style={{ marginBottom: 12 }}>
-            <input style={{ ...S.input, maxWidth: 90 }} placeholder="Lettera" value={nuova.code} maxLength={2}
+            <input style={{ ...S.input, maxWidth: 130 }} placeholder="Lettera (es. P)" value={nuova.code} maxLength={2}
                    onChange={(e) => setNuova({ ...nuova, code: e.target.value.toUpperCase().replace(/[^A-Z]/g, "") })} />
-            <input style={{ ...S.input, maxWidth: 110 }} inputMode="numeric" placeholder="Numero" value={nuova.number}
-                   onChange={(e) => setNuova({ ...nuova, number: e.target.value.replace(/\D/g, "") })} />
             <input style={S.input} placeholder="Nome (es. Po)" value={nuova.name} maxLength={60}
                    onChange={(e) => setNuova({ ...nuova, name: e.target.value })} />
           </div>
@@ -355,15 +391,15 @@ export function SezioniTab({ role }: { role: Role | null }) {
               </label>
             ))}
           </div>
-          <h3 style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>Intervalli di camere</h3>
+          <h3 style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>Piani e camere</h3>
           <Intervalli valore={nuova.ranges} lavanderie={lavanderie} onChange={(r) => setNuova({ ...nuova, ranges: r })} />
-          <button style={{ ...primario, marginTop: 12 }} disabled={busy || !nuova.code || !nuova.number || !nuova.name.trim()}
+          <button style={{ ...primario, marginTop: 12 }} disabled={busy || !nuova.code || !nuova.name.trim()}
             onClick={() => esegui(async () => {
               await call("sectionCreate", {
-                code: nuova.code, number: Number(nuova.number), name: nuova.name,
+                code: nuova.code, name: nuova.name,
                 features: nuova.features, ranges: rangesPerServer(nuova.ranges),
               });
-              setNuova({ code: "", number: "", name: "", features: {}, ranges: [] });
+              setNuova({ code: "", name: "", features: {}, ranges: [] });
             }, "Sezione creata.")}>
             Crea sezione
           </button>

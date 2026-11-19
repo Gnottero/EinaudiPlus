@@ -85,7 +85,7 @@ export async function getSnapshot(): Promise<{
     // scheda si apre — vedi grigliata_attiva_bool() in SQL.
     grigliataAttiva: Boolean(data.grigliata_attiva),
     // Server non ancora aggiornato: `pairs` assente -> 3, la sezione non si sa.
-    pairs: Number(data.pairs) >= 1 && Number(data.pairs) <= 3 ? Number(data.pairs) : 3,
+    pairs: Number(data.pairs) >= 1 && Number(data.pairs) <= 8 ? Number(data.pairs) : 3,
     section: (data.section as Section | null) ?? null,
   };
 }

@@ -3,8 +3,9 @@
 
 import { ValidationError } from "../../../shared/errors/AppError.js";
 import { parseIntInRange } from "../../../shared/validation/number.js";
-import { isFeature, isShareable } from "../domain/features.js";
+import { isFeature, isShareable, GLOBAL_FEATURES } from "../domain/features.js";
 
+const MAX_PAIRS = 8; // lettere A-H: tiene allineato il CHECK in SQL (machine.code, laundry.n_pairs)
 const CODE = /^[A-Za-z]{1,2}$/;
 const SLUG = /^[a-z0-9][a-z0-9-]{1,30}$/;
 
@@ -21,6 +22,7 @@ export function parseFeatures(v) {
   const out = {};
   for (const [k, val] of Object.entries(v)) {
     if (!isFeature(k)) throw new ValidationError(`funzionalita' sconosciuta: ${k}`);
+    if (GLOBAL_FEATURES.includes(k)) continue; // comuni a tutto il collegio: non si spengono
     if (typeof val !== "boolean") throw new ValidationError(`funzionalita' ${k}: vero o falso`);
     out[k] = val;
   }
@@ -78,8 +80,9 @@ export function parseRanges(v) {
 export async function adminCreateSection({ code, number, name, features, ranges }, { sectionsRepository, invalidate }) {
   const c = String(code ?? "").trim();
   if (!CODE.test(c)) throw new ValidationError("la lettera della sezione: una o due lettere");
-  const n = parseIntInRange(number, 1, 99);
-  if (n === null) throw new ValidationError("numero di sezione: da 1 a 99");
+  // senza numero lo assegna la SQL (max + 1)
+  const n = number === undefined || number === null || number === "" ? null : parseIntInRange(number, 1, 99);
+  if (number !== undefined && number !== null && number !== "" && n === null) throw new ValidationError("numero di sezione: da 1 a 99");
   const res = await sectionsRepository.createSection({
     code: c.toUpperCase(), number: n, name: parseName(name, "nome"),
     features: parseFeatures(features), ranges: parseRanges(ranges ?? []),
@@ -129,8 +132,8 @@ export async function adminSetRanges({ id, ranges }, { sectionsRepository, inval
 }
 
 function parsePairs(v) {
-  const p = parseIntInRange(v, 1, 3);
-  if (p === null) throw new ValidationError("coppie lavatrice/asciugatrice: da 1 a 3");
+  const p = parseIntInRange(v, 1, MAX_PAIRS);
+  if (p === null) throw new ValidationError(`coppie lavatrice/asciugatrice: da 1 a ${MAX_PAIRS}`);
   return p;
 }
 

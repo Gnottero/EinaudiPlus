@@ -232,17 +232,18 @@ export function isValidRoom(v: string, config: SectionConfig | null = getCachedC
 /**
  * Quali macchine esistono FISICAMENTE nella lavanderia di una camera.
  *
- * `pairs` (1–3) e' il numero di coppie lavatrice/asciugatrice di quella
+ * `pairs` (1–8) e' il numero di coppie lavatrice/asciugatrice di quella
  * lavanderia, come lo dichiara il server nello snapshot: la lavatrice X
  * prenota in automatico l'asciugatrice X, quindi i due numeri coincidono.
  * Prima la regola era "camere 1–99 una coppia, dal 100 in su tre" e dipendeva
  * dal numero di camera — adesso e' un dato della lavanderia, configurabile.
  */
 const DEFAULT_PAIRS = 3;
+export const MAX_PAIRS = 8; // lettere A-H, come il CHECK di machine.code in SQL
 
 export function machinesFor(pairs: number): { washers: string[]; dryers: string[] } {
-  const n = Math.min(3, Math.max(1, Math.trunc(pairs) || DEFAULT_PAIRS));
-  const lettere = ["A", "B", "C"].slice(0, n);
+  const n = Math.min(MAX_PAIRS, Math.max(1, Math.trunc(pairs) || DEFAULT_PAIRS));
+  const lettere = "ABCDEFGH".slice(0, n).split("");
   return { washers: lettere.map((l) => "W-" + l), dryers: lettere.map((l) => "D-" + l) };
 }
 

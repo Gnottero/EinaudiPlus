@@ -62,7 +62,7 @@ insert into laundry (slug, name, reminder_mode, room_min, room_max) values
 
 create table machine (
   laundry_id smallint not null references laundry(id) on delete cascade,
-  code       text     not null check (code ~ '^[WD]-[ABC]$'),
+  code       text     not null check (code ~ '^[WD]-[A-H]$'),
   kind       text     not null check (kind in ('washer','dryer')),
   is_oos     boolean  not null default false,
   bookable   boolean  not null default true,

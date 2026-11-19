@@ -108,7 +108,9 @@ check("setRanges passa gli intervalli validati", calls.at(-1).name === "setRange
 await adminCreateLaundry({ slug: "Po-Mole", name: "Lavanderia", pairs: 2 }, adm);
 check("crea lavanderia: slug minuscolo", calls.at(-1).args.slug === "po-mole" && calls.at(-1).args.pairs === 2);
 check("coppie 0 respinte", (await throws(() => adminCreateLaundry({ slug: "ab", name: "x", pairs: 0 }, adm))) !== null);
-check("coppie 4 respinte", (await throws(() => adminCreateLaundry({ slug: "ab", name: "x", pairs: 4 }, adm))) !== null);
+check("coppie 9 respinte", (await throws(() => adminCreateLaundry({ slug: "ab", name: "x", pairs: 9 }, adm))) !== null);
+await adminCreateLaundry({ slug: "ab", name: "x", pairs: 8 }, adm);
+check("8 coppie accettate", calls.at(-1).args.pairs === 8);
 check("slug con spazi respinto", (await throws(() => adminCreateLaundry({ slug: "a b", name: "x", pairs: 1 }, adm))) !== null);
 await adminUpdateLaundry({ id: 3, pairs: 3 }, adm);
 check("update lavanderia: nome non dato = null", calls.at(-1).args.name === null && calls.at(-1).args.pairs === 3);
@@ -124,14 +126,15 @@ check("senza sessione: false", authorize(null, "sectionUpdate") === false);
 
 section("resourceSection() / sampleRoomForLaundry()");
 check("senza condivisione: la propria", resourceSection(CONFIG, 1, "conference") === 1 && resourceSection(CONFIG, 2, "cinema") === 2);
-check("con condivisione: quella dell'altra", resourceSection(CONFIG, 3, "conference") === 1 && resourceSection(CONFIG, 3, "theme") === 1);
-check("... solo per la risorsa condivisa", resourceSection(CONFIG, 3, "grigliata") === 3 && resourceSection(CONFIG, 3, "linen") === 3);
+check("con condivisione: quella dell'altra", resourceSection(CONFIG, 3, "conference") === 1);
+check("... solo per la risorsa condivisa", resourceSection(CONFIG, 3, "grigliata") === 3);
+check("linen e theme: globali, della sezione con l'id piu' basso", resourceSection(CONFIG, 3, "linen") === 1 && resourceSection(CONFIG, 3, "theme") === 1);
 check("sezione sconosciuta: l'id stesso (come la SQL)", resourceSection(CONFIG, 99, "conference") === 99);
 check("sampleRoomForLaundry: una camera della lavanderia", sampleRoomForLaundry(CONFIG, 1) === "V101" && sampleRoomForLaundry(CONFIG, 2) === "V1");
 check("... preferendo la sezione data", sampleRoomForLaundry(CONFIG, 3, 3) === "M1" && sampleRoomForLaundry(CONFIG, 3, 2) === "P1");
 check("lavanderia non usata: null", sampleRoomForLaundry(CONFIG, 99) === null);
 check("sectionIdOfRange", sectionIdOfRange(CONFIG, 21) === 2 && sectionIdOfRange(CONFIG, 999) === null);
-check("risorse condivisibili", ["cinema", "music", "conference", "linen", "grigliata", "theme"].every(isShareable) && !isShareable("laundry") && !isShareable("bikes"));
+check("risorse condivisibili", ["cinema", "music", "conference", "grigliata"].every(isShareable) && !isShareable("linen") && !isShareable("theme") && !isShareable("laundry") && !isShareable("bikes"));
 
 section("scopeDecision() — il modello v2.0 (una sezione per account)");
 const sup = { role: "superadmin", sectionId: null };
@@ -173,7 +176,7 @@ check("room: bici di un'altra sezione", !d(adminV, "biciAddRoom", { room: "P5" }
 // risorse per sezione, con condivisione
 check("resource: la propria sezione possiede la sala polivalente", (() => { const r = d(adminV, "conferenzaAdd"); return r.allowed && r.resourceSectionId === 1; })());
 check("resource condivisa: M usa la polivalente di V", d(adminM, "conferenzaAdd").resourceSectionId === 1 && d(adminM, "temaSet").resourceSectionId === 1);
-check("resource non condivisa: M ha la sua grigliata e il suo cambio biancheria", d(adminM, "grigliataCrea").resourceSectionId === 3 && d(adminM, "cambioBiancheriaSet").resourceSectionId === 3);
+check("resource non condivisa: M ha la sua grigliata; il cambio biancheria e' globale", d(adminM, "grigliataCrea").resourceSectionId === 3 && d(adminM, "cambioBiancheriaSet").resourceSectionId === 1);
 check("sala: la feature segue body.space", d(adminM, "spaceSetChiuso", { space: "music" }).resourceSectionId === 3 && d(adminM, "bookSpaceDirezione", { space: "cinema" }).resourceSectionId === 3);
 check("panoramica sale: le sezioni proprietarie (cinema e musica separate)", JSON.stringify(d(adminV, "spaces").spaceSectionIds) === "[1]");
 check("resource senza sezione (superadmin): 400 'indica la sezione'", (() => { const r = d(sup, "conferenzaAdd"); return !r.allowed && r.status === 400 && /sezione/.test(r.reason); })());
@@ -248,7 +251,7 @@ section("adminSetSharing() / adminSetRangeStyle()");
   check("oggetto vuoto = togli ogni condivisione", JSON.stringify(calls2[1].args.shared) === "{}");
   check("risorsa non condivisibile (laundry, bikes): respinta", (await throws(() => adminSetSharing({ id: 2, shared: { laundry: 1 } }, adm2))) !== null && (await throws(() => adminSetSharing({ id: 2, shared: { bikes: 1 } }, adm2))) !== null);
   check("sezione non valida / non oggetto: respinte", (await throws(() => adminSetSharing({ id: 2, shared: { conference: "x" } }, adm2))) !== null && (await throws(() => adminSetSharing({ id: 2, shared: [1] }, adm2))) !== null && (await throws(() => adminSetSharing({ id: 2, shared: null }, adm2))) !== null);
-  check("parseSharing", Object.keys(parseSharing({ theme: 4, linen: "" })).join() === "theme");
+  check("parseSharing", Object.keys(parseSharing({ grigliata: 4, music: "" })).join() === "grigliata");
   await adminSetRangeStyle({ rangeId: "12", label: " 1° piano ", color: "#22C55E" }, adm2);
   check("stile intervallo: id, nome ripulito, colore normalizzato", calls2.at(-1).name === "setRangeStyle" && calls2.at(-1).args.rangeId === 12 && calls2.at(-1).args.label === "1° piano" && calls2.at(-1).args.color === "#22c55e");
   await adminSetRangeStyle({ rangeId: 12, color: "" }, adm2);
@@ -259,7 +262,7 @@ section("adminSetSharing() / adminSetRangeStyle()");
   await adminCreateSection({ code: "q", number: 5, name: "Q", ranges: [{ label: "A", from: 1, to: 9, color: "#AABBCC" }] }, adm2);
   check("gli intervalli di una nuova sezione portano il colore", calls2.at(-1).args.ranges[0].color === "#aabbcc");
   check("colore non valido in un intervallo: respinto", (await throws(() => adminCreateSection({ code: "q", number: 5, name: "Q", ranges: [{ label: "A", from: 1, to: 9, color: "blu" }] }, adm2))) !== null);
-  check("la feature `theme` e' nota", Object.keys(parseFeatures({ theme: false })).join() === "theme");
+  check("le feature globali (theme) si ignorano: non si spengono", Object.keys(parseFeatures({ theme: false, bikes: false })).join() === "bikes");
 }
 
 console.log(`\nPASSATI: ${pass}   FALLITI: ${fail}`);

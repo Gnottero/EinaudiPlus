@@ -1,7 +1,7 @@
 #!/bin/bash
 # Test SQL delle sezioni su un Postgres LOCALE usa-e-getta (docker). Non tocca
 # mai Supabase. Due percorsi:
-#   upgrade — schema attuale + dati "vecchio formato" + migrazione 061;
+#   upgrade — schema attuale + dati "vecchio formato" + migrazioni 061 e 062;
 #   rebuild — ricostruzione da zero coi file consolidati (con sezioni.sql).
 # Uso: tests/sql/run.sh          (serve docker; scarica postgres:16-alpine)
 set -euo pipefail
@@ -17,11 +17,13 @@ fresh() {
 }
 base() { for f in schema functions admin sysadmin polivalente account telegram reminders bici tema cambio-biancheria grigliata; do q -q < supabase/$f.sql >/dev/null; done; }
 
-echo "== upgrade (vecchio formato -> 061) =="
+echo "== upgrade (vecchio formato -> 062) =="
 fresh; base
 q -q < tests/sql/legacy-seed.sql >/dev/null
 q -q -1 < supabase/migrations/061-sezioni.sql >/dev/null
 q -q -1 < supabase/migrations/061-sezioni.sql >/dev/null   # idempotente
+q -q -1 < supabase/migrations/062-sezioni-ux.sql >/dev/null
+q -q -1 < supabase/migrations/062-sezioni-ux.sql >/dev/null   # idempotente
 q -t -c "select 'backfill: ' || (select string_agg(room, ',' order by id) from laundry_booking)" | grep -q "V112,V21-b,DIREZIONE" && echo "  ok    backfill V + DIREZIONE intatta"
 q -t -c "select 'bike: ' || (select string_agg(room, ',' order by room) from bike)" | grep -q "V007,V112" && echo "  ok    backfill bici"
 q -t -c "select 1 from space_booking where name = 'V112'" | grep -q 1 && echo "  ok    backfill nome sala = camera"

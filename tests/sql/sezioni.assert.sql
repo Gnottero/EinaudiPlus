@@ -24,7 +24,7 @@ select _ok('crea lavanderia condivisa 2 coppie',
   (laundry_admin_create('po-mole', 'Lavanderia Po-Mole', 2::smallint)->>'ok')::boolean);
 select _ok('2 coppie: A e B prenotabili, C no',
   (select count(*) filter (where bookable) from machine where laundry_id = (select id from laundry where slug='po-mole')) = 4
-  and (select not bookable and is_oos from machine where laundry_id=(select id from laundry where slug='po-mole') and code='W-C'));
+  and not exists (select 1 from machine where laundry_id=(select id from laundry where slug='po-mole') and code='W-C' and bookable));
 
 select _ok('crea sezione P',
   (section_admin_create('P', 2::smallint, 'Po',
@@ -226,7 +226,9 @@ select _ok('imposta il tema di P', (sysadmin_set_theme('natale', (select id from
 select _ok('... e solo quello',
   app_theme_get((select id from section where code='P')) = 'natale'
   and app_theme_get((select id from section where code='M')) = 'nessuno');
-select _ok('lo snapshot porta il tema della propria sezione', laundry_snapshot('P5')->>'tema' = 'natale' and laundry_snapshot('M5')->>'tema' = 'nessuno');
+-- v2.1: tema e cambio biancheria sono globali: lo snapshot legge quelli della sezione col minimo id (V)
+select sysadmin_set_theme('halloween', (select min(id) from section));
+select _ok('lo snapshot porta il tema globale a tutte le sezioni', laundry_snapshot('P5')->>'tema' = 'halloween' and laundry_snapshot('M5')->>'tema' = 'halloween');
 select _ok('lo snapshot porta la grigliata della propria sezione',
   (laundry_snapshot('P5')->>'grigliata_attiva')::boolean and not (laundry_snapshot('M5')->>'grigliata_attiva')::boolean);
 
@@ -275,3 +277,19 @@ select _ok('anon non esegue resource_actors', not has_function_privilege('anon',
 select _ok('anon non esegue section_admin_set_sharing', not has_function_privilege('anon', 'section_admin_set_sharing(smallint,jsonb)', 'execute'));
 select _ok('anon non esegue sysadmin_purge', not has_function_privilege('anon', 'sysadmin_purge(text,text,smallint)', 'execute'));
 select _ok('service_role esegue conference_agenda', has_function_privilege('service_role', 'conference_agenda(integer,smallint)', 'execute'));
+
+-- v2.1: coppie fino a 8, numero di sezione automatico, risorse globali
+select _ok('crea lavanderia da 5 coppie', (laundry_admin_create('cinque', 'Cinque', 5::smallint)->>'ok')::boolean);
+select _ok('5 coppie: 10 macchine prenotabili',
+  (select count(*) from machine where laundry_id=(select id from laundry where slug='cinque') and bookable and not is_oos) = 10);
+select _ok('9 coppie respinte', not (laundry_admin_create('nove', 'Nove', 9::smallint)->>'ok')::boolean);
+select laundry_admin_update((select id from laundry where slug='cinque'), null, 2::smallint);
+select _ok('scendendo a 2 coppie le altre vanno fuori servizio',
+  (select count(*) from machine where laundry_id=(select id from laundry where slug='cinque') and bookable) = 4
+  and (select is_oos and not bookable from machine where laundry_id=(select id from laundry where slug='cinque') and code='D-E'));
+select _ok('numero di sezione automatico',
+  (section_admin_create('Q', null, 'Auto')->'section'->>'number')::int = (select max(number) from section where code <> 'Q') + 1);
+select _ok('cambio biancheria e tema: stesso proprietario per tutte le sezioni',
+  resource_section((select id from section where code='Q'), 'linen') = (select min(id) from section)
+  and resource_section((select id from section where code='Q'), 'theme') = (select min(id) from section)
+  and resource_section((select id from section where code='Q'), 'cinema') = (select id from section where code='Q'));

@@ -4,6 +4,7 @@
 //     laundries: [{ id, slug, name, pairs }] }
 
 import { sectionCodeOf, roomDigits } from "../../../shared/validation/room.js";
+import { GLOBAL_RESOURCES } from "./features.js";
 
 export function findSectionByCode(config, code) {
   return (config?.sections ?? []).find((s) => s.code === code) ?? null;
@@ -38,6 +39,11 @@ export function sectionIdsOfLaundry(config, laundryId) {
  * Specchio di resource_section() in SQL: vanno tenute allineate.
  */
 export function resourceSection(config, sectionId, feature) {
+  // linen e theme: uno per tutto il collegio, della sezione con l'id piu' basso.
+  if (GLOBAL_RESOURCES.includes(feature)) {
+    const ids = (config?.sections ?? []).map((x) => x.id);
+    return ids.length ? Math.min(...ids) : sectionId;
+  }
   const s = (config?.sections ?? []).find((x) => x.id === sectionId);
   const v = s?.shared_with?.[feature];
   return v === undefined || v === null || v === "" ? sectionId : Number(v);

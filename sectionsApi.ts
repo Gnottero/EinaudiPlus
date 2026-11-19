@@ -20,7 +20,7 @@ export type FeatureKey =
   | "linen" | "grigliata" | "feedback" | "notifications" | "theme";
 
 /** Le risorse che una sezione puo' CONDIVIDERE con un'altra (section.shared_with). */
-export type SharedKey = "cinema" | "music" | "conference" | "linen" | "grigliata" | "theme";
+export type SharedKey = "cinema" | "music" | "conference" | "grigliata";
 
 interface SectionRange {
   id?: number; label: string; from: number; to: number; laundry_id: number | null;
@@ -115,5 +115,8 @@ export function resolveRoom(config: SectionConfig | null, room: string | null | 
 }
 
 /** true se la funzionalita' e' accesa (o se non si sa: nessuna sezione = tutto acceso). */
+export const GLOBAL_FEATURES: FeatureKey[] = ["notifications", "linen", "theme"];
+
+/** Le funzioni comuni a tutto il collegio (notifiche, cambio biancheria, tema) sono sempre accese. */
 export const featureOn = (section: Section | null | undefined, f: FeatureKey): boolean =>
-  section?.features?.[f] !== false;
+  GLOBAL_FEATURES.includes(f) || section?.features?.[f] !== false;

@@ -25,7 +25,7 @@ import {
 
 export { authorize } from "./domain/policy.js";
 export { RESOURCE_KINDS } from "./application/resourceActors.js";
-export { FEATURES, SHAREABLE, isFeature, isShareable, isFeatureEnabled } from "./domain/features.js";
+export { FEATURES, GLOBAL_FEATURES, SHAREABLE, isFeature, isShareable, isFeatureEnabled } from "./domain/features.js";
 export { scopeDecision, filterByScope, REGOLE } from "./domain/scope.js";
 export { sampleRoomForLaundry, resourceSection, findSectionById, sectionIdOfRange, resolveRoom, sectionIdsOfLaundry, sectionIdOfCode, findSectionByCode } from "./domain/config.js";
 
