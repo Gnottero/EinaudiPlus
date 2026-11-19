@@ -10,6 +10,8 @@
 // funziona lo stesso, semplicemente senza nascondere niente e senza il
 // controllo semantico sulla camera — la sintassi e il server fanno il resto.
 
+import { getAdminSection } from "./features/admin-shared/adminApi";
+
 const TOKEN = import.meta.env.VITE_SECRET_TOKEN;
 
 /** Le funzionalita' che una sezione puo' spegnere. Chiave mancante = accesa. */
@@ -42,6 +44,24 @@ export interface SectionConfig {
 /** La camera dichiarata su questo dispositivo. */
 export function currentRoom(): string {
   try { return localStorage.getItem("laundryhub.room") || ""; } catch { return ""; }
+}
+
+// Sezione dell'account admin (null = superadmin). Arriva da /api/admin/auth.
+let accountSection: number | null = null;
+export const setAccountSection = (id: number | null): void => { accountSection = id; };
+
+/**
+ * Chi amministra senza camera entra come DIREZIONE, e il server vuole sapere
+ * di QUALE sezione guarda cinema/musica/polivalente (`&section=<lettera>`).
+ * Vuoto se non e' la Direzione. shortcut: il superadmin che non ha ancora
+ * scelto una sezione ottiene la prima attiva; upgrade se serve un selettore anche fuori dal pannello.
+ */
+export function directionSectionParam(): string {
+  if (currentRoom() !== "DIREZIONE") return "";
+  const sections = cache?.sections ?? [];
+  const id = getAdminSection() ?? accountSection;
+  const sec = sections.find((x) => x.id === id) ?? sections.find((x) => x.active);
+  return sec ? `&section=${encodeURIComponent(sec.code)}` : "";
 }
 
 let cache: SectionConfig | null = null;

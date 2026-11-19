@@ -32,7 +32,7 @@ export interface RoomBooking {
   group?: string;
 }
 
-import { currentRoom } from "./sectionsApi";
+import { currentRoom, directionSectionParam } from "./sectionsApi";
 
 const TOKEN = import.meta.env.VITE_SECRET_TOKEN;
 
@@ -48,7 +48,7 @@ const TOKEN = import.meta.env.VITE_SECRET_TOKEN;
 function url(room: RoomKind, action?: string): string {
   // `room` e' la camera di chi guarda: il server la usa per sapere se la sua
   // sezione ha acceso questo spazio (403 se no).
-  return `/api/rooms?token=${TOKEN}&space=${room}&room=${encodeURIComponent(currentRoom())}` + (action ? `&action=${action}` : "");
+  return `/api/rooms?token=${TOKEN}&space=${room}&room=${encodeURIComponent(currentRoom())}${directionSectionParam()}` + (action ? `&action=${action}` : "");
 }
 
 const overlaps = (list: RoomBooking[], b: { day: number; start: number; end: number }) =>

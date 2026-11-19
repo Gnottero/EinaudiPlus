@@ -7,7 +7,7 @@
 // Non c'è una funzione "prenota" che i residenti possano chiamare, perché non
 // esiste proprio: la sala la programma la direzione, gli altri la guardano.
 
-import { currentRoom } from "./sectionsApi";
+import { currentRoom, directionSectionParam } from "./sectionsApi";
 
 const TOKEN = import.meta.env.VITE_SECRET_TOKEN;
 
@@ -62,7 +62,7 @@ export interface Regola {
 }
 
 export async function agenda(giorni = 30): Promise<Agenda> {
-  const res = await fetch(`/api/conferenze?token=${TOKEN}&giorni=${giorni}&room=${encodeURIComponent(currentRoom())}`);
+  const res = await fetch(`/api/conferenze?token=${TOKEN}&giorni=${giorni}&room=${encodeURIComponent(currentRoom())}${directionSectionParam()}`);
   const d = await res.json().catch(() => null);
   if (!res.ok && !d?.error) throw new Error("network");
   if (!d) throw new Error("network");

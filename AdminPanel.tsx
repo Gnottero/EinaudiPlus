@@ -17,7 +17,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { call, getAdminSection, setAdminSection } from "./features/admin-shared/adminApi";
-import { invalidateSectionConfig, loadSectionConfig } from "./sectionsApi";
+import { invalidateSectionConfig, loadSectionConfig, setAccountSection } from "./sectionsApi";
 import { S } from "./features/admin-shared/adminStyles";
 import type { Laundry } from "./features/laundry/admin/types";
 import { Login } from "./features/identity/admin/Login";
@@ -86,6 +86,7 @@ export function AdminScreens({ tab, onSession }: {
         setRole(d.role || null);
         setUsername(d.user || null);
         setDeveCambiare(Boolean(d.deve_cambiare_password));
+        setAccountSection(d.section_id ?? null);
         onSession(d.logged ? (d.role as Role) : null);
       })
       .catch(() => { setLogged(false); onSession(null); });

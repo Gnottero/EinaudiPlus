@@ -5,7 +5,7 @@
 // due backend voleva dire tenere in piedi due comportamenti diversi, ognuno da
 // spiegare a chi legge.
 
-import { currentRoom, getCachedConfig, resolveRoom, type Section } from "./sectionsApi";
+import { currentRoom, getCachedConfig, resolveRoom, setAccountSection, type Section } from "./sectionsApi";
 
 const TOKEN = import.meta.env.VITE_SECRET_TOKEN;
 
@@ -250,6 +250,7 @@ export async function adminSession(): Promise<{ role: string | null; deveCambiar
       return nessuna;
     }
     // v1.10: la camera associata all'account (delegato/sistemista), se c'è.
+    setAccountSection(data.section_id ?? null);
     return { role, deveCambiarePassword: Boolean(data.deve_cambiare_password), camera: data.camera || null };
   } catch {
     return nessuna;
