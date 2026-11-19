@@ -485,7 +485,7 @@ export default function App() {
       </button>
     </CenterState>
   ) : roomNumber === null ? (
-    <LoginScreen lang={lang} config={sectionConfig} onLogin={chooseRoom}/>
+    <LoginScreen lang={lang} config={sectionConfig} onLogin={chooseRoom} onAdmin={() => setAdminLoginOpen(true)}/>
   ) : (
     <>
       {screen===0 && <Dashboard   theme={theme} lang={lang} week={week} status={status} roomNumber={roomNumber} isAdmin={isAdmin} favs={favs} onToggleFav={toggleFav} onBook={handleBook} onClear={handleClear} onGoDay={vaiAlGiorno} cambioBiancheria={cambioBiancheria}/>}

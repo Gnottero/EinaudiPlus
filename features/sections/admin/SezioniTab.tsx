@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { call } from "../../admin-shared/adminApi";
+import { call as callBase } from "../../admin-shared/adminApi";
 import { S } from "../../admin-shared/adminStyles";
 import { invalidateSectionConfig, loadSectionConfig, type SectionConfig, type SharedKey } from "../../../sectionsApi";
 import type { Role } from "../../admin-shared/types";
@@ -17,6 +17,11 @@ import type { Role } from "../../admin-shared/types";
 // Una lavanderia puo' servire piu' sezioni (es. Po e Mole): l'elenco
 // "condivisa con" sotto ogni lavanderia lo dice, e chi ha ambito su una
 // qualsiasi delle sezioni che la usano la puo' modificare.
+
+// Il selettore di sezione del pannello (solo superadmin) manderebbe section_id
+// su ogni chiamata e farebbe rifiutare le modifiche a una sezione DIVERSA da
+// quella scelta: qui l'id della sezione e' nel payload, il selettore non conta.
+const call = (action: string, payload: Record<string, unknown> = {}) => callBase(action, { ...payload, section_id: undefined });
 
 type Range = { id?: number; label: string; from: number | ""; to: number | ""; laundry_id: number | null; color?: string | null };
 type Sezione = {
@@ -46,9 +51,6 @@ const FUNZIONI: { key: string; label: string }[] = [
   { key: "grigliata", label: "Grigliata" },
   { key: "feedback", label: "Segnalazioni" },
 ];
-
-// Comuni a tutto il collegio: non si accendono ne' si spengono per sezione.
-const NOTA_COMUNI = "Notifiche (push e Telegram), cambio biancheria e tema stagionale sono comuni a tutte le sezioni: sempre attivi, non si configurano qui.";
 
 const PALETTE = ["#f97316", "#eab308", "#22c55e", "#3b82f6", "#a855f7", "#ec4899", "#14b8a6", "#ef4444"];
 const MAX_COPPIE = 8;
@@ -156,6 +158,8 @@ export function SezioniTab({ role }: { role: Role | null }) {
   // Nuova sezione / nuova lavanderia (solo superadmin).
   const [nuova, setNuova] = useState<{ code: string; name: string; features: Record<string, boolean>; ranges: Range[] }>(
     { code: "", name: "", features: {}, ranges: [] });
+  // Vista mostrata: id sezione, "lav" (lavanderie) o "nuova" (solo superadmin).
+  const [vista, setVista] = useState<number | "lav" | "nuova" | null>(null);
   const [nuovaLav, setNuovaLav] = useState({ slug: "", name: "", pairs: 2 });
 
   const load = useCallback(async () => {
@@ -185,105 +189,105 @@ export function SezioniTab({ role }: { role: Role | null }) {
   // Chi ha un ambito limitato vede solo le lavanderie usate dalle sue sezioni.
   const lavanderieVisibili = superadmin ? lavanderie : lavanderie.filter((l) => sezioniDiLavanderia(l.id).length > 0);
 
+
+  const corrente = typeof vista === "number" ? sezioni.find((s) => s.id === vista) ?? sezioni[0] : vista === null ? sezioni[0] : undefined;
+  const vistaAttiva = corrente ? corrente.id : vista === "lav" || vista === "nuova" ? vista : null;
+  const chip = (on: boolean) => (on ? { ...primario } : { ...S.btn });
+  const titolo = (t: string, aiuto?: string) => (
+    <div style={{ marginBottom: 12 }}>
+      <h2 style={{ fontSize: 15, fontWeight: 700 }}>{t}</h2>
+      {aiuto && <p style={{ fontSize: 12, ...S.sub, marginTop: 2 }}>{aiuto}</p>}
+    </div>
+  );
+  const card = { ...S.card, padding: 18, marginBottom: 16 } as const;
+
+  const modificheGenerali = (s: Sezione) => bozzaFunzioni[s.id] !== undefined || (bozzaNome[s.id] !== undefined && bozzaNome[s.id].trim() !== s.name);
+
   return (
     <>
-      <p style={{ fontSize: 13, ...S.sub, marginBottom: 16 }}>
-        Una sezione e' un gruppo di camere con la stessa lettera (V112, P21-b). Per ognuna scegli quali
-        funzioni sono attive, quali risorse sono sue o condivise, e i piani con la lavanderia che usano.
-        Due sezioni possono usare la stessa lavanderia. {NOTA_COMUNI}
-      </p>
-      {msg && <div style={{ ...S.card, padding: 12, marginBottom: 16, fontSize: 13 }}>{msg}</div>}
+      {msg && <div role="status" style={{ ...S.card, padding: 12, marginBottom: 16, fontSize: 13 }}>{msg}</div>}
 
-      {sezioni.map((s) => {
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 16 }}>
+        {sezioni.map((s) => (
+          <button key={s.id} style={{ ...chip(vistaAttiva === s.id), opacity: s.active ? 1 : 0.6 }} onClick={() => setVista(s.id)}>{s.code} · {s.name}</button>
+        ))}
+        <button style={chip(vistaAttiva === "lav")} onClick={() => setVista("lav")}>Lavanderie</button>
+        {superadmin && <button style={chip(vistaAttiva === "nuova")} onClick={() => setVista("nuova")}>+ Nuova sezione</button>}
+      </div>
+      {sezioni.length === 0 && vistaAttiva === null && <p style={{ fontSize: 13, ...S.sub }}>Nessuna sezione nel tuo ambito.</p>}
+
+      {corrente && vistaAttiva === corrente.id && (() => {
+        const s = corrente;
         const f = funzioniDi(s);
-        const sporca = bozzaFunzioni[s.id] !== undefined;
+        const cond = bozzaCond[s.id] ?? s.shared_with ?? {};
+        const sporcaC = bozzaCond[s.id] !== undefined;
+        const sporcaG = modificheGenerali(s);
         return (
-          <div key={s.id} style={{ ...S.card, padding: 18, marginBottom: 16, opacity: s.active ? 1 : 0.6 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 12 }}>
-              <h2 style={{ fontSize: 15, fontWeight: 700, flex: 1 }}>
-                {s.code} · {s.name} <span style={{ ...S.sub, fontWeight: 400 }}>(sezione {s.number})</span>
-                {!s.active && <span style={{ ...S.sub, fontWeight: 400 }}> — disattivata</span>}
-              </h2>
-              {superadmin && (
-                <button style={S.btn} disabled={busy}
-                  onClick={() => esegui(() => call("sectionUpdate", { id: s.id, active: !s.active }), s.active ? "Sezione disattivata." : "Sezione riattivata.")}>
-                  {s.active ? "Disattiva" : "Riattiva"}
+          <>
+            <div style={{ ...card, opacity: s.active ? 1 : 0.7 }}>
+              {titolo(`Generale — sezione ${s.number}, lettera ${s.code}`, "Nome della sezione e funzioni attive. Una funzione spenta sparisce per chi abita qui. Notifiche, cambio biancheria e tema sono comuni a tutto il collegio e non si configurano.")}
+              <Campo nome="Nome">
+                <input style={S.input} value={bozzaNome[s.id] ?? s.name} maxLength={60}
+                       onChange={(e) => setBozzaNome({ ...bozzaNome, [s.id]: e.target.value })} />
+              </Campo>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 6, margin: "12px 0" }}>
+                {FUNZIONI.map((fn) => (
+                  <label key={fn.key} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
+                    <input type="checkbox" checked={acceso(f, fn.key)}
+                           onChange={(e) => setBozzaFunzioni({ ...bozzaFunzioni, [s.id]: { ...f, [fn.key]: e.target.checked } })} />
+                    {fn.label}
+                  </label>
+                ))}
+              </div>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <button style={sporcaG ? primario : S.btn} disabled={busy || !sporcaG}
+                  onClick={() => esegui(() => call("sectionUpdate", {
+                    id: s.id,
+                    ...(bozzaNome[s.id] !== undefined && bozzaNome[s.id].trim() !== s.name ? { name: bozzaNome[s.id] } : {}),
+                    ...(bozzaFunzioni[s.id] !== undefined ? { features: bozzaFunzioni[s.id] } : {}),
+                  }), "Salvato.")}>
+                  Salva
                 </button>
-              )}
+                {superadmin && (
+                  <button style={S.btn} disabled={busy}
+                    onClick={() => esegui(() => call("sectionUpdate", { id: s.id, active: !s.active }), s.active ? "Sezione disattivata." : "Sezione riattivata.")}>
+                    {s.active ? "Disattiva sezione" : "Riattiva sezione"}
+                  </button>
+                )}
+              </div>
             </div>
 
-            <div className="adm-form" style={{ marginBottom: 12 }}>
-              <input style={S.input} value={bozzaNome[s.id] ?? s.name} maxLength={60}
-                     onChange={(e) => setBozzaNome({ ...bozzaNome, [s.id]: e.target.value })} />
-              <button style={S.btn} disabled={busy || bozzaNome[s.id] === undefined || bozzaNome[s.id].trim() === s.name}
-                onClick={() => esegui(() => call("sectionUpdate", { id: s.id, name: bozzaNome[s.id] }), "Nome salvato.")}>
-                Salva nome
+            <div style={card}>
+              {titolo("Risorse proprie o condivise", "Di base ogni sezione ha le sue sale e la sua grigliata. Se ne condividi una, la sezione scelta ne è la proprietaria: usate la stessa e gli admin di entrambe la gestiscono.")}
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 8 }}>
+                {RISORSE.map((r) => {
+                  const altre = tutteLeSezioni.filter((x) => x.id !== s.id && x.active && !(x.shared_with?.[r.key]));
+                  // Se altre sezioni usano gia' la risorsa di questa, questa non puo' usare quella di un'altra.
+                  const laUsanoAltri = tutteLeSezioni.some((x) => x.id !== s.id && x.shared_with?.[r.key] === s.id);
+                  return (
+                    <label key={r.key} style={{ fontSize: 13, display: "grid", gap: 4 }}>
+                      {r.label}
+                      <select style={S.input} value={cond[r.key] ?? ""} disabled={laUsanoAltri}
+                              onChange={(e) => setBozzaCond({ ...bozzaCond, [s.id]: { ...cond, [r.key]: e.target.value === "" ? null : Number(e.target.value) } })}>
+                        <option value="">Propria (indipendente)</option>
+                        {altre.map((x) => <option key={x.id} value={x.id}>Condivisa con {x.code} · {x.name}</option>)}
+                      </select>
+                      {laUsanoAltri && <span style={{ fontSize: 11, ...S.sub }}>Altre sezioni usano già la tua: non può essere condivisa a sua volta.</span>}
+                    </label>
+                  );
+                })}
+              </div>
+              <button style={{ ...(sporcaC ? primario : S.btn), marginTop: 12 }} disabled={busy || !sporcaC}
+                onClick={() => esegui(() => call("sectionSetSharing", { id: s.id, shared: Object.fromEntries(RISORSE.map((r) => [r.key, cond[r.key] ?? null])) }), "Condivisioni salvate.")}>
+                Salva
               </button>
             </div>
 
-            <h3 style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>Funzioni</h3>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 6, marginBottom: 10 }}>
-              {FUNZIONI.map((fn) => (
-                <label key={fn.key} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
-                  <input type="checkbox" checked={acceso(f, fn.key)}
-                         onChange={(e) => setBozzaFunzioni({ ...bozzaFunzioni, [s.id]: { ...f, [fn.key]: e.target.checked } })} />
-                  {fn.label}
-                </label>
-              ))}
-            </div>
-            <button style={sporca ? primario : S.btn} disabled={busy || !sporca}
-              onClick={() => esegui(() => call("sectionUpdate", { id: s.id, features: bozzaFunzioni[s.id] }), "Funzioni salvate.")}>
-              Salva funzioni
-            </button>
-            <p style={{ fontSize: 12, ...S.sub, marginTop: 6 }}>
-              Una funzione spenta sparisce per chi abita in questa sezione. {NOTA_COMUNI}
-            </p>
-
-            <h3 style={{ fontSize: 13, fontWeight: 700, margin: "16px 0 8px" }}>Risorse: proprie o condivise</h3>
-            <p style={{ fontSize: 12, ...S.sub, marginBottom: 8 }}>
-              Ogni sezione ha le sue risorse, indipendenti dalle altre. Se ne condividi una, la sezione
-              scelta ne e' la proprietaria: voi due usate la stessa e gli amministratori di entrambe la
-              gestiscono insieme.
-            </p>
-            {(() => {
-              const cond = bozzaCond[s.id] ?? s.shared_with ?? {};
-              const sporcaC = bozzaCond[s.id] !== undefined;
-              return (
-                <>
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 8 }}>
-                    {RISORSE.map((r) => {
-                      const altre = tutteLeSezioni.filter((x) =>
-                        x.id !== s.id && x.active && !(x.shared_with?.[r.key]));
-                      // Se altre sezioni usano gia' la risorsa di questa, questa non puo' usare quella di un'altra.
-                      const laUsanoAltri = tutteLeSezioni.some((x) => x.id !== s.id && x.shared_with?.[r.key] === s.id);
-                      return (
-                        <label key={r.key} style={{ fontSize: 13, display: "grid", gap: 4 }}>
-                          {r.label}
-                          <select style={S.input} value={cond[r.key] ?? ""} disabled={laUsanoAltri}
-                                  onChange={(e) => setBozzaCond({ ...bozzaCond, [s.id]: { ...cond, [r.key]: e.target.value === "" ? null : Number(e.target.value) } })}>
-                            <option value="">Propria (indipendente)</option>
-                            {altre.map((x) => <option key={x.id} value={x.id}>Condivisa con {x.code} · {x.name}</option>)}
-                          </select>
-                          {laUsanoAltri && <span style={{ fontSize: 11, ...S.sub }}>Altre sezioni usano gia' la tua: non puo' essere condivisa a sua volta.</span>}
-                        </label>
-                      );
-                    })}
-                  </div>
-                  <button style={{ ...(sporcaC ? primario : S.btn), marginTop: 8 }} disabled={busy || !sporcaC}
-                    onClick={() => esegui(() => call("sectionSetSharing", { id: s.id, shared: Object.fromEntries(RISORSE.map((r) => [r.key, cond[r.key] ?? null])) }), "Condivisioni salvate.")}>
-                    Salva condivisioni
-                  </button>
-                </>
-              );
-            })()}
-
-            <h3 style={{ fontSize: 13, fontWeight: 700, margin: "16px 0 8px" }}>Piani e camere</h3>
-            {!superadmin && (
-              <>
-                <p style={{ fontSize: 12, ...S.sub, marginBottom: 8 }}>
-                  Nome e colore di ogni gruppo di camere (un piano, un edificio): il colore e' quello
-                  con cui compaiono le camere nelle griglie e negli elenchi.
-                </p>
+            <div style={card}>
+              {titolo("Piani e camere", superadmin
+                ? "Quali camere fanno parte della sezione, il colore con cui compaiono e la lavanderia che usano."
+                : "Nome e colore di ogni gruppo di camere. Cambiare i numeri dei piani lo fa un superadmin.")}
+              {!superadmin ? (
                 <div style={{ display: "grid", gap: 6 }}>
                   {s.ranges.map((r) => {
                     const st = bozzaStile[r.id] ?? { label: r.label, color: r.color ?? "#999999" };
@@ -307,74 +311,71 @@ export function SezioniTab({ role }: { role: Role | null }) {
                     );
                   })}
                 </div>
-              </>
-            )}
-            {superadmin && <Intervalli valore={intervalliDi(s)} lavanderie={lavanderie}
-                        onChange={(r) => setBozzaRanges({ ...bozzaRanges, [s.id]: r })} />}
-            {superadmin && (
-              <button style={bozzaRanges[s.id] ? { ...primario, marginTop: 8 } : { ...S.btn, marginTop: 8 }} disabled={busy || !bozzaRanges[s.id]}
-                onClick={() => esegui(() => call("sectionSetRanges", { id: s.id, ranges: rangesPerServer(bozzaRanges[s.id]) }), "Piani salvati.")}>
-                Salva piani
-              </button>
-            )}
-            {!superadmin && <p style={{ fontSize: 12, ...S.sub, marginTop: 6 }}>Aggiungere o cambiare i numeri dei piani lo fa un superadmin.</p>}
-          </div>
-        );
-      })}
-      {sezioni.length === 0 && <p style={{ fontSize: 13, ...S.sub }}>Nessuna sezione nel tuo ambito.</p>}
-
-      <div style={{ ...S.card, padding: 18, marginBottom: 16 }}>
-        <h2 style={{ fontSize: 15, fontWeight: 700, marginBottom: 12 }}>Lavanderie</h2>
-        <div style={{ display: "grid", gap: 10 }}>
-          {lavanderieVisibili.map((l) => {
-            const b = bozzaLav[l.id] ?? { name: l.name, pairs: l.pairs };
-            const condivisa = sezioniDiLavanderia(l.id);
-            const sporca = b.name.trim() !== l.name || b.pairs !== l.pairs;
-            return (
-              <div key={l.id} className="adm-form">
-                <input style={S.input} value={b.name} maxLength={60}
-                       onChange={(e) => setBozzaLav({ ...bozzaLav, [l.id]: { ...b, name: e.target.value } })} />
-                <Contatore valore={b.pairs} onChange={(n) => setBozzaLav({ ...bozzaLav, [l.id]: { ...b, pairs: n } })} />
-                <span style={{ fontSize: 12, ...S.sub }}>{testoMacchine(b.pairs)}</span>
-                <button style={sporca ? primario : S.btn} disabled={busy || !sporca}
-                  onClick={() => esegui(() => call("laundryUpdate", { id: l.id, name: b.name, pairs: b.pairs }), "Lavanderia salvata.")}>
-                  Salva
-                </button>
-                <span style={{ fontSize: 12, ...S.sub, flexBasis: "100%" }}>
-                  {condivisa.length === 0 ? "Non usata da nessuna sezione"
-                    : condivisa.length === 1 ? `Usata da ${condivisa[0].code}`
-                    : `Condivisa fra ${condivisa.map((x) => x.code).join(" e ")}`}
-                  {" · "}da 1 a 8 coppie; la lavatrice A prenota in automatico l'asciugatrice A, e cosi' via
-                </span>
-              </div>
-            );
-          })}
-        </div>
-        {superadmin && (
-          <>
-            <h3 style={{ fontSize: 13, fontWeight: 700, margin: "16px 0 8px" }}>Nuova lavanderia</h3>
-            <div className="adm-form">
-              <input style={S.input} placeholder="Identificativo (es. po-mole)" value={nuovaLav.slug} maxLength={31}
-                     onChange={(e) => setNuovaLav({ ...nuovaLav, slug: e.target.value })} />
-              <input style={S.input} placeholder="Nome" value={nuovaLav.name} maxLength={60}
-                     onChange={(e) => setNuovaLav({ ...nuovaLav, name: e.target.value })} />
-              <Contatore valore={nuovaLav.pairs} onChange={(n) => setNuovaLav({ ...nuovaLav, pairs: n })} />
-              <span style={{ fontSize: 12, ...S.sub }}>{testoMacchine(nuovaLav.pairs)}</span>
-              <button style={primario} disabled={busy}
-                onClick={() => esegui(async () => { await call("laundryCreate", nuovaLav); setNuovaLav({ slug: "", name: "", pairs: 2 }); }, "Lavanderia creata.")}>
-                Crea
-              </button>
+              ) : (
+                <>
+                  <Intervalli valore={intervalliDi(s)} lavanderie={lavanderie}
+                              onChange={(r) => setBozzaRanges({ ...bozzaRanges, [s.id]: r })} />
+                  <button style={{ ...(bozzaRanges[s.id] ? primario : S.btn), marginTop: 12 }} disabled={busy || !bozzaRanges[s.id]}
+                    onClick={() => esegui(() => call("sectionSetRanges", { id: s.id, ranges: rangesPerServer(bozzaRanges[s.id]) }), "Piani salvati.")}>
+                    Salva
+                  </button>
+                </>
+              )}
             </div>
           </>
-        )}
-      </div>
+        );
+      })()}
 
-      {superadmin && (
-        <div style={{ ...S.card, padding: 18 }}>
-          <h2 style={{ fontSize: 15, fontWeight: 700, marginBottom: 4 }}>Nuova sezione</h2>
-          <p style={{ fontSize: 12, ...S.sub, marginBottom: 12 }}>
-            Il numero di sezione e' automatico (il prossimo libero). Se la sezione ha una lavanderia nuova, creala prima qui sopra.
-          </p>
+      {vistaAttiva === "lav" && (
+        <div style={card}>
+          {titolo("Lavanderie", "Da 1 a 8 coppie lavatrice/asciugatrice: la lavatrice A prenota in automatico l'asciugatrice A, e così via. Una lavanderia può servire più sezioni.")}
+          <div style={{ display: "grid", gap: 14 }}>
+            {lavanderieVisibili.map((l) => {
+              const b = bozzaLav[l.id] ?? { name: l.name, pairs: l.pairs };
+              const condivisa = sezioniDiLavanderia(l.id);
+              const sporca = b.name.trim() !== l.name || b.pairs !== l.pairs;
+              return (
+                <div key={l.id} className="adm-form" style={{ alignItems: "center" }}>
+                  <input style={S.input} value={b.name} maxLength={60}
+                         onChange={(e) => setBozzaLav({ ...bozzaLav, [l.id]: { ...b, name: e.target.value } })} />
+                  <Contatore valore={b.pairs} onChange={(n) => setBozzaLav({ ...bozzaLav, [l.id]: { ...b, pairs: n } })} />
+                  <span style={{ fontSize: 12, ...S.sub }}>{testoMacchine(b.pairs)}</span>
+                  <button style={sporca ? primario : S.btn} disabled={busy || !sporca}
+                    onClick={() => esegui(() => call("laundryUpdate", { id: l.id, name: b.name, pairs: b.pairs }), "Lavanderia salvata.")}>
+                    Salva
+                  </button>
+                  <span style={{ fontSize: 12, ...S.sub, flexBasis: "100%" }}>
+                    {condivisa.length === 0 ? "Non usata da nessuna sezione"
+                      : condivisa.length === 1 ? `Usata da ${condivisa[0].code}`
+                      : `Condivisa fra ${condivisa.map((x) => x.code).join(" e ")}`}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+          {superadmin && (
+            <>
+              <h3 style={{ fontSize: 13, fontWeight: 700, margin: "20px 0 8px" }}>Nuova lavanderia</h3>
+              <div className="adm-form">
+                <input style={S.input} placeholder="Identificativo (es. po-mole)" value={nuovaLav.slug} maxLength={31}
+                       onChange={(e) => setNuovaLav({ ...nuovaLav, slug: e.target.value })} />
+                <input style={S.input} placeholder="Nome" value={nuovaLav.name} maxLength={60}
+                       onChange={(e) => setNuovaLav({ ...nuovaLav, name: e.target.value })} />
+                <Contatore valore={nuovaLav.pairs} onChange={(n) => setNuovaLav({ ...nuovaLav, pairs: n })} />
+                <span style={{ fontSize: 12, ...S.sub }}>{testoMacchine(nuovaLav.pairs)}</span>
+                <button style={primario} disabled={busy}
+                  onClick={() => esegui(async () => { await call("laundryCreate", nuovaLav); setNuovaLav({ slug: "", name: "", pairs: 2 }); }, "Lavanderia creata.")}>
+                  Crea
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      {superadmin && vistaAttiva === "nuova" && (
+        <div style={card}>
+          {titolo("Nuova sezione", "Il numero è automatico (il prossimo libero). Se la sezione ha una lavanderia nuova, creala prima nella scheda Lavanderie.")}
           <div className="adm-form" style={{ marginBottom: 12 }}>
             <input style={{ ...S.input, maxWidth: 130 }} placeholder="Lettera (es. P)" value={nuova.code} maxLength={2}
                    onChange={(e) => setNuova({ ...nuova, code: e.target.value.toUpperCase().replace(/[^A-Z]/g, "") })} />

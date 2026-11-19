@@ -9,8 +9,8 @@ import { RED, RED_FG, type Theme } from "../tema";
 
 // ─── Login screen ─────────────────────────────────────────────────────────────
 
-export function LoginScreen({ lang, config, onLogin }: {
-  theme?: Theme; lang: Lang; config: SectionConfig | null; onLogin: (room: string) => void;
+export function LoginScreen({ lang, config, onLogin, onAdmin }: {
+  theme?: Theme; lang: Lang; config: SectionConfig | null; onLogin: (room: string) => void; onAdmin: () => void;
 }) {
   const t = T[lang];
   const [room, setRoom] = useState("");
@@ -22,6 +22,8 @@ export function LoginScreen({ lang, config, onLogin }: {
   function submit() {
     if (room.length === 0) return;
     const r = normalizeRoom(room);
+    // 1935 non e' una camera: apre il login amministratore (e' solo il form, la sicurezza resta server-side).
+    if (r === "1935") { setRoom(""); onAdmin(); return; }
     if (!isValidRoom(r, config)) {
       alert(t.roomFormatError);
       return;

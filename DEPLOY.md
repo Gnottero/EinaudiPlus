@@ -416,7 +416,7 @@ Agosto 2026, saltando la finestra di osservazione su decisione esplicita:
   trova Macchine, Segnalazioni — e da sistemista Ricorrenti e Manutenzione —
   nella stessa lista di Lavanderia, Cinema e Musica.
 
-  **Si entra da `/admin`** (dal v2.0; prima si digitava `1935` al posto della camera). Non è una
+  **Si entra da `/admin`, oppure digitando `1935` al posto della camera** (entrambe le strade aprono lo stesso form). Non è una
   password: chi lo digita vede solo il form di login, che resta l'unica cosa
   che conta. Tenerlo lì invece che nel menu evita a ogni residente una voce che
   non potrebbe comunque usare.
