@@ -65,7 +65,7 @@ export function Login({ onDone }: { onDone: () => void }) {
         {err && <p style={{ fontSize: 13, color: "var(--destructive-text)", marginBottom: 12 }}>{err}</p>}
 
         <button type="submit" disabled={busy || !pronto}
-          style={{ ...S.btn, width: "100%", padding: 12, background: "var(--primary)", color: "var(--primary-foreground)", borderColor: "transparent" }}>
+          style={{ ...S.btn, width: "100%", padding: 12, background: "var(--primary)", color: "var(--primary-foreground)" }}>
           {busy ? "Accesso…" : "Entra"}
         </button>
       </form>

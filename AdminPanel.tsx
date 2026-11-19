@@ -183,13 +183,10 @@ export function AdminScreens({ tab, onSession }: {
           la scelta viaggia con ogni chiamata (adminApi.ts). Gli altri ruoli non
           vedono il selettore: hanno UNA sezione, decisa dal loro account. */}
       {superadmin && tab !== "sezioni" && tab !== "account" && (
-        <div style={{ ...S.card, padding: 12, marginBottom: 16, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-          <label style={{ fontSize: 12, fontWeight: 700, ...S.sub }}>Sezione</label>
-          <select style={{ ...S.input, width: "auto", minWidth: 160 }} value={sezioneSel ?? ""}
-                  onChange={(e) => scegliSezione(e.target.value === "" ? null : Number(e.target.value))}>
-            <option value="">Scegli una sezione…</option>
-            {sezioni.map((x) => <option key={x.id} value={x.id}>{x.code} · {x.name}</option>)}
-          </select>
+        <div className="segmenti" role="group" aria-label="Sezione" style={{ marginBottom: 16 }}>
+          {sezioni.map((x) => (
+            <button key={x.id} aria-pressed={sezioneSel === x.id} onClick={() => scegliSezione(x.id)}>{x.code} · {x.name}</button>
+          ))}
         </div>
       )}
 

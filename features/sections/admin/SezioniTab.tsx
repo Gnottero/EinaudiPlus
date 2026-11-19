@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { call as callBase } from "../../admin-shared/adminApi";
 import { S } from "../../admin-shared/adminStyles";
+import { Interruttore } from "../../admin-shared/Interruttore";
 import { invalidateSectionConfig, loadSectionConfig, type SectionConfig, type SharedKey } from "../../../sectionsApi";
 import type { Role } from "../../admin-shared/types";
 
@@ -75,7 +76,7 @@ const Campo = ({ nome, children, stile }: { nome: string; children: React.ReactN
 );
 
 const acceso = (f: Record<string, boolean>, k: string) => f?.[k] !== false;
-const primario = { ...S.btn, background: "var(--primary)", color: "var(--primary-foreground)", borderColor: "transparent" } as const;
+const primario = S.primary;
 
 /** Editor dei piani / gruppi di camere di una sezione, ognuno con la sua lavanderia. */
 function Intervalli({ valore, onChange, lavanderie, disabled }: {
@@ -192,11 +193,10 @@ export function SezioniTab({ role }: { role: Role | null }) {
 
   const corrente = typeof vista === "number" ? sezioni.find((s) => s.id === vista) ?? sezioni[0] : vista === null ? sezioni[0] : undefined;
   const vistaAttiva = corrente ? corrente.id : vista === "lav" || vista === "nuova" ? vista : null;
-  const chip = (on: boolean) => (on ? { ...primario } : { ...S.btn });
   const titolo = (t: string, aiuto?: string) => (
     <div style={{ marginBottom: 12 }}>
-      <h2 style={{ fontSize: 15, fontWeight: 700 }}>{t}</h2>
-      {aiuto && <p style={{ fontSize: 12, ...S.sub, marginTop: 2 }}>{aiuto}</p>}
+      <h2 style={{ fontSize: 20, fontWeight: 700, letterSpacing: "-0.01em" }}>{t}</h2>
+      {aiuto && <p style={{ fontSize: 13, ...S.sub, marginTop: 4, lineHeight: 1.35 }}>{aiuto}</p>}
     </div>
   );
   const card = { ...S.card, padding: 18, marginBottom: 16 } as const;
@@ -207,12 +207,18 @@ export function SezioniTab({ role }: { role: Role | null }) {
     <>
       {msg && <div role="status" style={{ ...S.card, padding: 12, marginBottom: 16, fontSize: 13 }}>{msg}</div>}
 
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 16 }}>
+      <div className="riepilogo">
+        <div className="riepilogo__voce"><div className="riepilogo__n">{sezioni.filter((x) => x.active).length}/{sezioni.length}</div><div className="riepilogo__l">Sezioni attive</div></div>
+        <div className="riepilogo__voce"><div className="riepilogo__n">{lavanderieVisibili.length}</div><div className="riepilogo__l">Lavanderie</div></div>
+        <div className="riepilogo__voce"><div className="riepilogo__n">{sezioni.reduce((n, x) => n + x.ranges.length, 0)}</div><div className="riepilogo__l">Gruppi di camere</div></div>
+      </div>
+
+      <div className="segmenti" role="group" aria-label="Sezione" style={{ marginBottom: 16 }}>
         {sezioni.map((s) => (
-          <button key={s.id} style={{ ...chip(vistaAttiva === s.id), opacity: s.active ? 1 : 0.6 }} onClick={() => setVista(s.id)}>{s.code} · {s.name}</button>
+          <button key={s.id} aria-pressed={vistaAttiva === s.id} style={{ opacity: s.active ? 1 : 0.6 }} onClick={() => setVista(s.id)}>{s.code} · {s.name}</button>
         ))}
-        <button style={chip(vistaAttiva === "lav")} onClick={() => setVista("lav")}>Lavanderie</button>
-        {superadmin && <button style={chip(vistaAttiva === "nuova")} onClick={() => setVista("nuova")}>+ Nuova sezione</button>}
+        <button aria-pressed={vistaAttiva === "lav"} onClick={() => setVista("lav")}>Lavanderie</button>
+        {superadmin && <button aria-pressed={vistaAttiva === "nuova"} onClick={() => setVista("nuova")}>+ Nuova sezione</button>}
       </div>
       {sezioni.length === 0 && vistaAttiva === null && <p style={{ fontSize: 13, ...S.sub }}>Nessuna sezione nel tuo ambito.</p>}
 
@@ -230,13 +236,12 @@ export function SezioniTab({ role }: { role: Role | null }) {
                 <input style={S.input} value={bozzaNome[s.id] ?? s.name} maxLength={60}
                        onChange={(e) => setBozzaNome({ ...bozzaNome, [s.id]: e.target.value })} />
               </Campo>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 6, margin: "12px 0" }}>
+              <div className="grp__corpo" style={{ margin: "12px 0" }}>
                 {FUNZIONI.map((fn) => (
-                  <label key={fn.key} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
-                    <input type="checkbox" checked={acceso(f, fn.key)}
-                           onChange={(e) => setBozzaFunzioni({ ...bozzaFunzioni, [s.id]: { ...f, [fn.key]: e.target.checked } })} />
-                    {fn.label}
-                  </label>
+                  <div key={fn.key} className="grp__riga">
+                    <Interruttore acceso={acceso(f, fn.key)} titolo={fn.label}
+                      onClick={() => setBozzaFunzioni({ ...bozzaFunzioni, [s.id]: { ...f, [fn.key]: !acceso(f, fn.key) } })} />
+                  </div>
                 ))}
               </div>
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -393,13 +398,12 @@ export function SezioniTab({ role }: { role: Role | null }) {
                    onChange={(e) => setNuova({ ...nuova, name: e.target.value })} />
           </div>
           <h3 style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>Funzioni</h3>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 6, marginBottom: 12 }}>
+          <div className="grp__corpo" style={{ marginBottom: 12 }}>
             {FUNZIONI.map((fn) => (
-              <label key={fn.key} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
-                <input type="checkbox" checked={acceso(nuova.features, fn.key)}
-                       onChange={(e) => setNuova({ ...nuova, features: { ...nuova.features, [fn.key]: e.target.checked } })} />
-                {fn.label}
-              </label>
+              <div key={fn.key} className="grp__riga">
+                <Interruttore acceso={acceso(nuova.features, fn.key)} titolo={fn.label}
+                  onClick={() => setNuova({ ...nuova, features: { ...nuova.features, [fn.key]: !acceso(nuova.features, fn.key) } })} />
+              </div>
             ))}
           </div>
           <h3 style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>Piani e camere</h3>

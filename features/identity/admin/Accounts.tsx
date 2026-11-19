@@ -164,10 +164,16 @@ export function Accounts({ me, myRole }: { me: string | null; myRole: Role | nul
         reimpostarne la password senza toccare la configurazione del server.
       </p>
 
-      {msg && <div style={{ ...S.card, padding: 12, marginBottom: 16, fontSize: 13 }}>{msg}</div>}
+      {msg && <div role="status" style={{ ...S.card, padding: 12, marginBottom: 16, fontSize: 13 }}>{msg}</div>}
+
+      <div className="riepilogo">
+        <div className="riepilogo__voce"><div className="riepilogo__n">{items.length}</div><div className="riepilogo__l">Account</div></div>
+        <div className="riepilogo__voce"><div className="riepilogo__n">{items.filter((a) => a.attivo).length}</div><div className="riepilogo__l">Attivi</div></div>
+        <div className="riepilogo__voce"><div className="riepilogo__n">{items.filter((a) => a.deve_cambiare_password).length}</div><div className="riepilogo__l">In attesa del primo accesso</div></div>
+      </div>
 
       <div style={{ ...S.card, padding: 18, marginBottom: 16 }}>
-        <h2 style={{ fontSize: 15, fontWeight: 700, marginBottom: 12 }}>Nuovo account</h2>
+        <h2 style={{ fontSize: 20, fontWeight: 700, letterSpacing: "-0.01em", marginBottom: 12 }}>Nuovo account</h2>
         <div className="adm-form">
           <input style={S.input} placeholder="Nome utente" value={username}
                  maxLength={24} onChange={(e) => setUsername(e.target.value)} />
@@ -179,7 +185,7 @@ export function Accounts({ me, myRole }: { me: string | null; myRole: Role | nul
           <button type="button" style={S.btn} onClick={() => { setPassword(generaPassword()); setMostraPassword(true); }}>
             Genera
           </button>
-          <button style={{ ...S.btn, background: "var(--primary)", color: "var(--primary-foreground)", borderColor: "transparent" }}
+          <button style={{ ...S.btn, background: "var(--primary)", color: "var(--primary-foreground)" }}
                   disabled={busy} onClick={crea}>Crea account</button>
         </div>
         {superadmin && ruolo !== "superadmin" && (
@@ -205,7 +211,7 @@ export function Accounts({ me, myRole }: { me: string | null; myRole: Role | nul
       </div>
 
       <div style={{ ...S.card, padding: 18 }}>
-        <h2 style={{ fontSize: 15, fontWeight: 700, marginBottom: 12 }}>Account ({items.length})</h2>
+        <h2 style={{ fontSize: 20, fontWeight: 700, letterSpacing: "-0.01em", marginBottom: 12 }}>Account ({items.length})</h2>
         {items.length === 0 && <p style={{ fontSize: 13, ...S.sub }}>Nessun account creato dal pannello.</p>}
         <div style={{ display: "grid", gap: 6 }}>
           {items.map((a) => (
@@ -215,7 +221,10 @@ export function Accounts({ me, myRole }: { me: string | null; myRole: Role | nul
                     molto diverse, e senza un minimo comune ogni riga faceva
                     iniziare il nome utente a un punto diverso — la colonna
                     non era una colonna. */}
-                <span style={{ fontSize: 11, fontWeight: 700, ...S.sub, textTransform: "uppercase", minWidth: "9ch", flexShrink: 0 }}>
+                <span style={{
+                  fontSize: 12, fontWeight: 600, padding: "3px 10px", borderRadius: 99, flexShrink: 0, textTransform: "capitalize",
+                  background: "color-mix(in srgb, var(--primary) 12%, transparent)", color: "var(--primary)",
+                }}>
                   {a.ruolo}
                 </span>
                 <span className="adm-rule__what">
@@ -280,7 +289,7 @@ export function Accounts({ me, myRole }: { me: string | null; myRole: Role | nul
                     <option value="">Scegli una sezione…</option>
                     {sezioni.map((x) => <option key={x.id} value={x.id}>{x.code} · {x.name}</option>)}
                   </select>
-                  <button style={{ ...S.btn, background: "var(--primary)", color: "var(--primary-foreground)", borderColor: "transparent" }}
+                  <button style={{ ...S.btn, background: "var(--primary)", color: "var(--primary-foreground)" }}
                           disabled={busy} onClick={salvaSezione}>Salva</button>
                   <button style={S.btn} disabled={busy} onClick={() => setSezioneEdit(null)}>Annulla</button>
                 </div>
@@ -290,7 +299,7 @@ export function Accounts({ me, myRole }: { me: string | null; myRole: Role | nul
                   <input style={S.input} placeholder="Camera con lettera, es. V112 (vuoto = nessuna)"
                          value={cameraEdit.valore} maxLength={6}
                          onChange={(e) => setCameraEdit({ id: a.id, valore: e.target.value })} />
-                  <button style={{ ...S.btn, background: "var(--primary)", color: "var(--primary-foreground)", borderColor: "transparent" }}
+                  <button style={{ ...S.btn, background: "var(--primary)", color: "var(--primary-foreground)" }}
                           disabled={busy} onClick={salvaCamera}>Salva</button>
                   <button style={S.btn} disabled={busy} onClick={() => setCameraEdit(null)}>Annulla</button>
                 </div>
@@ -302,7 +311,7 @@ export function Accounts({ me, myRole }: { me: string | null; myRole: Role | nul
                   <button type="button" style={S.btn} onClick={() => setReset({ id: a.id, password: generaPassword() })}>
                     Genera
                   </button>
-                  <button style={{ ...S.btn, background: "var(--primary)", color: "var(--primary-foreground)", borderColor: "transparent" }}
+                  <button style={{ ...S.btn, background: "var(--primary)", color: "var(--primary-foreground)" }}
                           disabled={busy} onClick={confermaReset}>Conferma</button>
                   <button style={S.btn} disabled={busy} onClick={() => setReset(null)}>Annulla</button>
                 </div>

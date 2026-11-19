@@ -138,7 +138,7 @@ function InvioNotifica() {
         onChange={(e) => setTesto(e.target.value)}
       />
       <button onClick={invia} disabled={busy || !titolo.trim() || !testo.trim() || !cameraOk}
-              style={{ ...S.btn, background: "var(--primary)", color: "var(--primary-foreground)", borderColor: "transparent", opacity: busy ? 0.6 : 1 }}>
+              style={{ ...S.btn, background: "var(--primary)", color: "var(--primary-foreground)", opacity: busy ? 0.6 : 1 }}>
         {busy ? "Invio…" : perCamera ? "Invia alla camera" : "Invia a tutti"}
       </button>
       {esito && <p style={{ fontSize: 13, ...S.sub, marginTop: 10 }}>{esito}</p>}

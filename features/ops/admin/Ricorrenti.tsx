@@ -179,7 +179,7 @@ export function Ricorrenti({ laundries }: { laundries: Laundry[] }) {
             <input style={S.input} placeholder={roomsHint ? `es. ${roomsHint}` : "Camera"}
                    value={room} onChange={(e) => setRoom(e.target.value)} />
           </div>
-          <button style={{ ...S.btn, background: "var(--primary)", color: "var(--primary-foreground)", borderColor: "transparent" }}
+          <button style={{ ...S.btn, background: "var(--primary)", color: "var(--primary-foreground)" }}
                   disabled={busy} onClick={addLaundry}>Aggiungi</button>
         </div>
       </div>
@@ -216,7 +216,7 @@ export function Ricorrenti({ laundries }: { laundries: Laundry[] }) {
             <label style={{ display: "block", fontSize: 11, ...S.sub, marginBottom: 4 }}>Nome</label>
             <input style={S.input} placeholder="es. Serata cinema" value={sName} onChange={(e) => setSName(e.target.value)} />
           </div>
-          <button style={{ ...S.btn, background: "var(--primary)", color: "var(--primary-foreground)", borderColor: "transparent" }}
+          <button style={{ ...S.btn, background: "var(--primary)", color: "var(--primary-foreground)" }}
                   disabled={busy} onClick={addSpace}>Aggiungi</button>
         </div>
       </div>

@@ -3,35 +3,7 @@ import { Plus, X } from "lucide-react";
 import { EMOJI_TICKET, EMOJI_TICKET_DEFAULT, suggerisciEmoji } from "../emojiTicket";
 import { S } from "../../admin-shared/adminStyles";
 
-/** Un interruttore con titolo e sottotitolo — fuori da GrigliataAdmin per lo
- *  stesso motivo di EditorMenu qui sotto. Stesso disegno del "senza glutine"
- *  lato residenti (features/grigliata/Grigliata.tsx). */
-export function Interruttore({ acceso, onClick, titolo, sottotitolo, disabilitato }: {
-  acceso: boolean; onClick: () => void; titolo: string; sottotitolo?: string; disabilitato?: boolean;
-}) {
-  return (
-    <button onClick={onClick} role="switch" aria-checked={acceso} disabled={disabilitato}
-      style={{
-        display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, width: "100%",
-        background: "none", border: "none", padding: 0, textAlign: "left", color: "var(--foreground)",
-        cursor: disabilitato ? "default" : "pointer", opacity: disabilitato ? 0.6 : 1,
-      }}>
-      <span style={{ minWidth: 0 }}>
-        <span style={{ display: "block", fontSize: 13, fontWeight: 700 }}>{titolo}</span>
-        {sottotitolo && <span style={{ display: "block", fontSize: 11, ...S.sub }}>{sottotitolo}</span>}
-      </span>
-      <span style={{
-        flexShrink: 0, display: "flex", alignItems: "center", borderRadius: 99, padding: 3,
-        width: 40, height: 24, boxSizing: "border-box",
-        background: acceso ? "var(--primary)" : "var(--secondary)",
-        border: acceso ? "none" : "1px solid var(--border)",
-        justifyContent: acceso ? "flex-end" : "flex-start",
-      }}>
-        <span style={{ width: 18, height: 18, borderRadius: 99, background: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,.3)" }} />
-      </span>
-    </button>
-  );
-}
+export { Interruttore } from "../../admin-shared/Interruttore";
 
 // ─── Editor dell'elenco dei menu ──────────────────────────────────────────────
 //

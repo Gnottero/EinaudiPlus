@@ -190,7 +190,7 @@ export function Bici({ sistemista }: { sistemista: boolean }) {
               onKeyDown={(e) => { if (e.key === "Enter") assegnaCamera(); }}
             />
             <button
-              style={{ ...S.btn, background: "var(--primary)", color: "var(--primary-foreground)", borderColor: "transparent" }}
+              style={{ ...S.btn, background: "var(--primary)", color: "var(--primary-foreground)" }}
               disabled={busy || !nuovaCamera.trim()} onClick={assegnaCamera}
             >
               Assegna

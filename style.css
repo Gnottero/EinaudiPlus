@@ -244,7 +244,7 @@
 }
 
 @theme inline {
-  --font-sans: "DM Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "DM Sans", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "Inter", ui-sans-serif, system-ui, sans-serif;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -766,3 +766,76 @@
   .tema-fiocco, .tema-pipistrello { animation: none; display: none; }
   .tema-zucca { animation: none; }
 }
+
+
+/* ── Apple Human Interface Guidelines ─────────────────────────────────────────
+   Un solo strato per tutta l'app: font di sistema (SF su Apple, niente file da
+   scaricare né da distribuire), feedback al tocco, anello di fuoco per la
+   tastiera, fogli modali stile iOS (angoli 14px, "maniglia", sfondo sfocato),
+   interruttori 51x31. I colori di stato restano quelli dichiarati sopra. */
+
+@layer base {
+  button, [role="button"], select, summary { -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+  button:not(:disabled), [role="button"] { cursor: pointer; transition: opacity .15s ease, transform .15s ease, background-color .15s ease; }
+  button:not(:disabled):active { opacity: .6; }
+  button:disabled { cursor: default; }
+  :focus-visible { outline: 3px solid color-mix(in srgb, var(--primary) 55%, transparent); outline-offset: 2px; }
+  /* 16px minimo: sotto, Safari su iPhone ingrandisce la pagina al fuoco */
+  input:not([type="checkbox"]):not([type="radio"]):not([type="color"]), select, textarea { font-size: 16px; }
+}
+
+/* Fogli modali: tutti i fogli dell'app usano `rounded-t-3xl` */
+.rounded-t-3xl {
+  border-top-left-radius: 14px;
+  border-top-right-radius: 14px;
+  box-shadow: 0 -8px 40px rgba(0, 0, 0, .18);
+  position: relative;
+  animation: foglioSale .28s cubic-bezier(.32, .72, 0, 1);
+}
+.rounded-t-3xl::before {
+  content: "";
+  display: block;
+  width: 36px; height: 5px; border-radius: 3px;
+  margin: 6px auto 0;
+  background: color-mix(in srgb, var(--foreground) 22%, transparent);
+}
+@keyframes foglioSale { from { transform: translateY(24px); opacity: .6; } to { transform: none; opacity: 1; } }
+/* Velo dietro al foglio: sfocato come in iOS */
+.fixed.inset-0.items-end { backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+@media (prefers-reduced-motion: reduce) {
+  .rounded-t-3xl { animation: none; }
+  button:not(:disabled) { transition: none; }
+}
+
+/* Interruttore (componente Interruttore) */
+.ios-switch {
+  flex-shrink: 0; position: relative; width: 51px; height: 31px; border-radius: 99px;
+  background: var(--switch-background); transition: background-color .2s ease;
+}
+.ios-switch::after {
+  content: ""; position: absolute; top: 2px; left: 2px; width: 27px; height: 27px; border-radius: 50%;
+  background: #fff; box-shadow: 0 2px 4px rgba(0, 0, 0, .25), 0 0 1px rgba(0, 0, 0, .2);
+  transition: transform .2s cubic-bezier(.32, .72, 0, 1);
+}
+.ios-switch[data-on="true"] { background: var(--status-free); }
+.ios-switch[data-on="true"]::after { transform: translateX(20px); }
+@media (prefers-reduced-motion: reduce) { .ios-switch, .ios-switch::after { transition: none; } }
+
+/* Gruppi "inset grouped" del pannello amministrativo */
+.grp { margin-bottom: 22px; }
+.grp__titolo { font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: .02em; color: var(--gray-accessible-text); margin: 0 16px 6px; }
+.grp__piede { font-size: 13px; color: var(--gray-accessible-text); margin: 6px 16px 0; line-height: 1.35; }
+.grp__corpo { background: var(--card); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+.grp__riga { padding: 12px 16px; min-height: 44px; display: flex; align-items: center; gap: 12px; }
+.grp__riga + .grp__riga { border-top: 1px solid var(--border); }
+
+/* Controllo segmentato (selettori di sezione) */
+.segmenti { display: flex; flex-wrap: wrap; gap: 2px; padding: 2px; border-radius: 10px; background: var(--secondary); }
+.segmenti > button { flex: 1 1 auto; min-height: 32px; padding: 4px 12px; border: 0; border-radius: 8px; background: transparent; color: var(--foreground); font-size: 13px; font-weight: 500; }
+.segmenti > button[aria-pressed="true"] { background: var(--card); font-weight: 600; box-shadow: 0 1px 3px rgba(0, 0, 0, .15), 0 0 0 .5px rgba(0, 0, 0, .06); }
+
+/* Riepilogo numerico in cima alle schede */
+.riepilogo { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-bottom: 20px; }
+.riepilogo__voce { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; }
+.riepilogo__n { font-size: 26px; font-weight: 700; letter-spacing: -.02em; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.riepilogo__l { font-size: 12px; color: var(--gray-accessible-text); margin-top: 2px; }

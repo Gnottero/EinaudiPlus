@@ -1065,10 +1065,9 @@ export function GrigliataAdmin() {
                 <option value="vegetariano">{NOME_DIETA.vegetariano}</option>
                 <option value="vegano">{NOME_DIETA.vegano}</option>
               </select>
-              <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, cursor: "pointer" }}>
-                <input type="checkbox" checked={nuovoGlutineCamera} onChange={(e) => setNuovoGlutineCamera(e.target.checked)} />
-                <WheatOff size={13} /> Senza glutine
-              </label>
+              <div style={{ minWidth: 200 }}>
+                <Interruttore acceso={nuovoGlutineCamera} onClick={() => setNuovoGlutineCamera((v) => !v)} titolo="Senza glutine" />
+              </div>
               </>}
               {cameraGiaIscritta && (
                 <p style={{ flexBasis: "100%", fontSize: 11, ...S.sub }}>
